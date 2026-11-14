@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.4.2';
+const APP_VERSION = '3.5.0';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -3173,6 +3173,7 @@ function viewStart() {
     main = `<div class="eyebrow">${dl_.active ? `Deload · Teil ${dl_.part} von 3` : `Als Nächstes · ${wd}`}</div>
       <h1 class="kurz" style="color:${TONE_HEX[DAY_TONE[nd]]}">${esc(dl(nd, me, sk))}</h1><div class="title">${esc(plan.title)}</div>
       <div class="mono muted small">${plan.exercises.length} Übungen · ${dl_.active ? `${plan.exercises.reduce((a, x) => a + Math.ceil((+x.sets || 1) / 2), 0)} Sätze (halbiert)` : `${nSets} Sätze`}${lastDone ? ` · zuletzt ${relDay(lastDone.ts)}` : ''}</div>
+      ${sk !== 'mine' ? vorBlock(nd, false) : ''}
       ${regenHint(nd)}
       ${dl_.active ? (dl_.reentry ? `<div class="deload"><b>Sanfter Wiedereinstieg</b><span class="muted">${dl_.reentry} Tage Pause. ${dl_.part === 1 ? 'Die nächsten 3 Trainings laufen' : `Noch ${4 - dl_.part} ${4 - dl_.part === 1 ? 'Training läuft' : 'Trainings laufen'}`} als Deload: Gewicht −10 %, halbe Sätze, Wiederholungen am unteren Ende.</span></div>`
         : `<div class="deload"><b>Deload-Woche</b><span class="muted">${esc(dl_.reason)}. Gewicht −10 %, halbe Sätze, Wiederholungen am unteren Ende. Danach geht es mit deinen bisherigen Gewichten weiter.</span></div>`) : ''}
@@ -3391,6 +3392,7 @@ function viewTraining() {
   return `<header class="trainhead" id="head">
       <div class="row">${backBtn('start', 'Zurück zum Start')}<span class="count" id="tp-count">${trainCountText()}</span>${bellBtn('tbell')}</div>
       <div class="ttl"><div><h1 class="kurz">${esc(dl(draft.day, null, draft.plan))}</h1><div class="sub">${esc(draft.title)}</div></div>${draft.deload ? '<span class="pill dl">Deload</span>' : ''}</div>
+      ${draft.plan !== 'mine' ? vorBlock(draft.day, true) : ''}
       <div class="bar"><i id="tp-bar" style="width:${tot ? done / tot * 100 : 0}%"></i></div>
     </header>
     <main class="view notab">${draft.items.map((it, i) => exCard(it, i)).join('')}</main>
@@ -4491,6 +4493,16 @@ function viewBell() {
     ${recent.join('') || `<section class="card"><div class="empty">${older.length ? 'Nichts Neues.' : hasCrew() ? 'Keine Unterschiede. Eure gemeinsamen Übungen sind gleich.' : 'Planänderungen gibt es, sobald du in einer Crew bist.'}</div></section>`}
     ${older.length ? `<details class="older"><summary>Ältere (${older.length})</summary><div style="display:flex;flex-direction:column;gap:12px;padding-top:12px">${older.join('')}</div></details>` : ''}
     ${mine.length && mates.length ? `<div class="sec-title"><h2>Deine Änderungen</h2></div><section class="card">${mineHtml}</section>` : ''}`;
+}
+// 3.5: Anpassungsvorschläge aus der Crew direkt auf dem Start und im Training (nur offene, nur für den Tag, der dran ist)
+const VOR_OPEN = new Set();
+const vorItems = day => bellItems().filter(x => x.status === 'open' && x.day === day && x.diff.length).sort((a, b) => new Date(b.pc.ts) - new Date(a.pc.ts));
+function vorBlock(day, inDraft) {
+  const list = vorItems(day); if (!list.length) return '';
+  const key = (inDraft ? 't|' : 's|') + day, open = VOR_OPEN.has(key);
+  const lab = list.length === 1 ? 'Anpassungsvorschlag' : `${list.length} Anpassungsvorschläge`;
+  const body = open ? list.map(x => `<div class="vp"><div class="vpr">${avatar(x.pc.person, 28)}<span class="vpn"><b>${nm(x.pc.person)}</b><span class="mono">${fmtDate(x.pc.ts)}</span></span><button class="rb" data-act="dismiss" data-id="${esc(x.pc.id)}" aria-label="Ablehnen">${ICON.x}</button><button class="rb ok" data-act="vor-ok" data-id="${esc(x.pc.id)}" data-d="${inDraft ? 1 : 0}" aria-label="Übernehmen">${ICON.check}</button></div><ul class="vl">${x.diff.map(d => `<li>${esc(diffText(d))}</li>`).join('')}</ul></div>`).join('') : '';
+  return `<div class="vor t-${DAY_TONE[day]}${open ? ' open' : ''}"><button class="vhead" data-act="vor-toggle" data-k="${esc(key)}" aria-expanded="${open}"><span class="vic">${ICON.swap}</span><span>${lab}</span><i class="vdot"></i><span class="vchev">${ICON.right}</span></button>${body}</div>`;
 }
 function acceptChange(changeId, intoDraft) {
   const s = st(), c = s.changes[changeId]; if (!c) return;
@@ -5662,6 +5674,8 @@ const actions = {
   accept: t => acceptChange(t.dataset.id, false),
   'accept-draft': t => acceptChange(t.dataset.id, true),
   dismiss: t => dismissChange(t.dataset.id),
+  'vor-toggle': t => { const k = t.dataset.k; VOR_OPEN.has(k) ? VOR_OPEN.delete(k) : VOR_OPEN.add(k); render(); },
+  'vor-ok': t => { acceptChange(t.dataset.id, t.dataset.d === '1'); render(); },
   'notice-ok': t => { const id = t.dataset.id; if (id === 'regen') LS.set('regen.ack', Date.now()); else { const a = LS.get('notice.ack', {}); a[id] = 1; LS.set('notice.ack', a); } render(); },
   bday: t => { builder.day = t.dataset.v; render(); },
   bmove: t => { const a = builder.work[builder.day].exercises, i = +t.dataset.i, j = i + +t.dataset.v; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; markDirty(); render(); },
