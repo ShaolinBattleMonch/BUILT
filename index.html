@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BUILT</title>
+<meta name="description" content="Trainingsplan und Fortschritte für Manu und Rob">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BUILT">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/unbounded.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="topbar" class="topbar" hidden><i></i></div>
+<div id="app"></div>
+<div id="modal"></div>
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="loader" class="loader" hidden>
+  <div class="ld-inner">
+    <div class="ld-brand">BUILT</div>
+    <div class="ld-block">
+      <div class="ld-text" id="ld-text">Verbinde …</div>
+      <div class="ld-sub" id="ld-sub"></div>
+      <div class="ld-track" role="progressbar" aria-label="Ladefortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="ld-track"><i id="ld-bar"></i></div>
+      <div class="ld-pct" id="ld-pct">0 %</div>
+    </div>
+  </div>
+</div>
+<script src="vendor/supabase-2.118.0.js"></script>
+<script src="vendor/qrcode-generator-2.0.4.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
