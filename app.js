@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.4.1';
+const APP_VERSION = '3.4.2';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -5428,7 +5428,7 @@ async function loadAccess() {
   ACCESS = r.error ? { access: true, required: false, admin: false, old: true } : r.data;   // ohne Skript 12: alles wie bisher
   LS.set('access', ACCESS); return ACCESS;
 }
-const APP_LINK = 'https://shaolinbattlemonch.github.io/Hantelbuch/';
+const APP_LINK = 'https://shaolinbattlemonch.github.io/BUILT/';
 const inviteText = x => `Hey, ich lade dich zu BUILT ein, unserer Trainings-App.
 
 1. Öffne den Link in deinem Browser:
