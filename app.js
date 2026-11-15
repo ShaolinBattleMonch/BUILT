@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.5.2';
+const APP_VERSION = '3.6.0';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -3084,7 +3084,8 @@ function render() {
     if (name === 'notizen' && NOTE_FOCUS) { const c = document.getElementById('nc-' + NOTE_FOCUS.ex); if (c) { c.scrollIntoView({ block: 'center' }); NOTE_FOCUS.t = Date.now(); } }
     if (name === 'scanner') startScan();
     trackView(name || 'start');
-    if (name === 'vault' && !vmeta() && !VAULT.restore && !hasConsent('health')) { history.replaceState(null, '', '#profil'); render(); healthSheet(() => { location.hash = '#vault'; }); return; }
+    if (name === 'vault' && healthDeclined() && !VAULT.restore) { history.replaceState(null, '', '#profil'); render(); healthSheet(() => { location.hash = '#vault'; }, 'vault'); return; }
+    if (name === 'vault-neu' && !hasConsent('health')) { history.replaceState(null, '', '#vault'); render(); healthSheet(() => { location.hash = '#vault-neu'; }, 'vault'); return; }
     if ((name === 'start' || name === '') && !draft && !LS.get('stats.asked', false) && CONSENTS.analytics === undefined && st().workouts.some(w => w.person === cfg.me && Date.now() - new Date(w.ts) < 864e5)) setTimeout(statsSheet, 600);
   }
   tabSlideIn();
@@ -4354,7 +4355,7 @@ function viewProfile(p) {
       </div>
       <button class="card goalcard" data-act="goal-open"><span style="display:flex;align-items:center;gap:12px">${flameImg(p, 36)}<span style="flex:1;display:flex;flex-direction:column;text-align:left"><b>Wochenziel · ${pzD ? (eGoal ? `${eGoal} ${eGoal === 1 ? 'Training' : 'Trainings'}` : 'eingefroren') : `${goal} ${goal === 1 ? 'Training' : 'Trainings'}`}</b><span class="small muted">${pzD ? `statt ${goal} · ${pzD} ${pzD === 1 ? 'Tag' : 'Tage'} Pause diese Woche` : `${wkN} von ${goal} diese Woche`}${(PROFILES[p] || {}).week_goal_next && new Date((PROFILES[p] || {}).week_goal_from) > new Date() ? ` · ab ${new Date(PROFILES[p].week_goal_from).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}: ${PROFILES[p].week_goal_next}` : ''}</span></span>${ICON.right}</span></button>
       ${bar}
-      <a class="vaultcard glass" href="#vault"><span class="ic">${ICON.lock}</span><span style="flex:1;display:flex;flex-direction:column;gap:2px"><b>Vault</b><span class="small muted">${vmeta() ? 'Private Bilder · nur für dich' : 'Private Fortschrittsbilder · Code festlegen'}</span></span>${ICON.right}</a>
+      ${healthDeclined() ? `<button class="vaultcard glass locked" data-act="vault-locked"><span class="ic">${ICON.lock}<svg class="slash" viewBox="0 0 50 50" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M10 10L40 40" stroke="#000" stroke-width="6"/><path d="M10 10L40 40" stroke="currentColor" stroke-width="2"/></svg></span><span style="flex:1;display:flex;flex-direction:column;gap:2px;text-align:left"><b>Vault</b><span class="small muted">Gesperrt · Einwilligung fehlt</span></span>${ICON.right}</button>` : `<a class="vaultcard glass" href="#vault"><span class="ic">${ICON.lock}</span><span style="flex:1;display:flex;flex-direction:column;gap:2px"><b>Vault</b><span class="small muted">${vmeta() ? 'Private Bilder · nur für dich' : 'Private Fortschrittsbilder · Code festlegen'}</span></span>${ICON.right}</a>`}
       ${galleryHTML()}`;
   }
   const recent = ws.slice().reverse().slice(0, 3);
@@ -4987,21 +4988,43 @@ async function setConsent(kind, granted) {
   CONSENTS[kind] = granted; LS.set('consents', CONSENTS); return true;
 }
 // Einwilligung für Gesundheitsdaten, einmalig vor dem ersten Eintrag
-function healthSheet(then, kind) {
-  HEALTH_NEXT = then;
-  if (kind === 'pause') {
-    sheet(`<span class="eyebrow">Einmalig</span><h2>Grund speichern?</h2>
-      <p class="muted" style="margin:0">„Krank“ und „Verletzt“ gelten als Gesundheitsangaben. Wir speichern sie deshalb nur, wenn du ausdrücklich zustimmst.</p>
-      <ul class="dots"><li>Den Grund siehst <b>nur du</b>. Deine Buddys sehen höchstens „Pause“, und auch das nur, wenn du es teilst.</li><li>Gespeichert in der EU (Frankfurt).</li><li>Jederzeit widerrufbar. Dabei werden die Gründe gelöscht, die Pausen bleiben.</li></ul>
-      <span class="small muted">Dieselbe Einwilligung gilt für Körpergewicht und Fortschrittsbilder im Vault. Mehr in der <a href="#rechtliches:datenschutz" data-act="mclose">Datenschutzerklärung</a>.</span>
-      <div class="btnrow col"><button class="btn primary" data-act="health-yes">Zustimmen</button><button class="btn ghost" data-act="pz-reopen">Nicht jetzt</button></div>`);
-    return;
-  }
-  sheet(`<span class="eyebrow">Einmalig vor dem ersten Eintrag</span><h2>Körpergewicht speichern?</h2>
-    <p class="muted" style="margin:0">Dein Körpergewicht gilt als Gesundheitsdatum. Wir speichern es deshalb nur, wenn du ausdrücklich zustimmst.</p>
-    <ul class="dots"><li>Standardmäßig <b>privat</b>. Freunde sehen es nur, wenn du es unter „Privatsphäre“ freigibst.</li><li>Gespeichert in der EU (Frankfurt), nur für deinen Verlauf.</li><li>Jederzeit widerrufbar. Dabei kannst du alle bisherigen Einträge löschen.</li></ul>
-    <span class="small muted">Dasselbe gilt für Fortschrittsbilder im Vault. Mehr in der <a href="#rechtliches:datenschutz" data-act="mclose">Datenschutzerklärung</a>.</span>
-    <div class="btnrow col"><button class="btn primary" data-act="health-yes">Zustimmen und speichern</button><button class="btn ghost" data-act="mclose">Nicht jetzt</button></div>`);
+// 3.6: Einwilligung Gesundheitsdaten – nur Zustimmen oder Ablehnen, danach Info, was geht bzw. gesperrt ist
+const healthDeclined = () => CONSENTS.health === false;
+const HEALTH_KINDS = {
+  vault: { h: 'Fortschrittsbilder speichern?', p: 'Fortschrittsbilder zeigen deinen Körper und gelten deshalb als Gesundheitsdaten. Wir speichern sie nur, wenn du ausdrücklich zustimmst.',
+    dots: ['Verschlüsselt gespeichert in der EU (Frankfurt).', 'Verschlüsselt mit deinem persönlichen Code. Nur du kannst sie sehen.', 'Jederzeit widerrufbar. Dabei werden die Bilder gelöscht.'],
+    more: 'Dieselbe Einwilligung gilt für dein Körpergewicht und die Pausengründe „Krank“ und „Verletzt“.', go: 'Bild hinzufügen' },
+  bw: { h: 'Körpergewicht speichern?', p: 'Dein Körpergewicht gilt als Gesundheitsdatum. Wir speichern es deshalb nur, wenn du ausdrücklich zustimmst.',
+    dots: ['Standardmäßig <b>privat</b>. Freunde sehen es nur, wenn du es unter „Privatsphäre“ freigibst.', 'Gespeichert in der EU (Frankfurt), nur für deinen Verlauf.', 'Jederzeit widerrufbar. Dabei kannst du alle bisherigen Einträge löschen.'],
+    more: 'Dieselbe Einwilligung gilt für Fortschrittsbilder im Vault und die Pausengründe „Krank“ und „Verletzt“.', go: 'Gewicht speichern' },
+  pause: { h: 'Grund speichern?', p: '„Krank“ und „Verletzt“ gelten als Gesundheitsangaben. Wir speichern sie deshalb nur, wenn du ausdrücklich zustimmst.',
+    dots: ['Den Grund siehst <b>nur du</b>. Deine Buddys sehen höchstens „Pause“, und auch das nur, wenn du es teilst.', 'Gespeichert in der EU (Frankfurt).', 'Jederzeit widerrufbar. Dabei werden die Gründe gelöscht, die Pausen bleiben.'],
+    more: 'Dieselbe Einwilligung gilt für dein Körpergewicht und Fortschrittsbilder im Vault.', go: 'Pause speichern' },
+  general: { h: 'Gesundheitsdaten freigeben?', p: 'Körpergewicht, Fortschrittsbilder und die Pausengründe „Krank“ und „Verletzt“ gelten als Gesundheitsdaten. Wir speichern sie nur, wenn du ausdrücklich zustimmst.',
+    dots: ['Gespeichert in der EU (Frankfurt).', 'Fortschrittsbilder verschlüsselt mit deinem persönlichen Code.', 'Jederzeit widerrufbar.'], more: '', go: 'Fertig' }
+};
+let HEALTH_KIND = 'general';
+function healthSheet(then, kind = 'bw') {
+  HEALTH_NEXT = then; HEALTH_KIND = HEALTH_KINDS[kind] ? kind : 'general';
+  const k = HEALTH_KINDS[HEALTH_KIND];
+  sheet(`<span class="eyebrow">Gesundheitsdaten · einmalig</span><h2>${k.h}</h2>
+    <p class="muted" style="margin:0">${k.p}</p>
+    <ul class="dots">${k.dots.map(d => `<li>${d}</li>`).join('')}</ul>
+    <span class="small muted">${k.more ? k.more + ' ' : ''}Mehr in der <a href="#rechtliches:datenschutz" data-act="mclose">Datenschutzerklärung</a>.</span>
+    <div class="btnrow col"><button class="btn primary" data-act="health-yes">Zustimmen</button><button class="btn ghost" data-act="health-no">Ablehnen</button></div>`);
+}
+function healthOkSheet() {
+  sheet(`<span class="eyebrow">Freigegeben</span><h2>Das geht jetzt</h2>
+    <ul class="dots"><li>Fortschrittsbilder verschlüsselt im Vault speichern</li><li>Dein Körpergewicht eintragen und den Verlauf sehen</li><li>Bei einer Trainingspause „Krank“ oder „Verletzt“ angeben. Die Crew sieht höchstens „Pause“.</li><li>Körpergewicht auf Wunsch mit deinen Buddys teilen</li></ul>
+    <span class="small muted">Widerrufen kannst du jederzeit unter Einstellungen → Privatsphäre.</span>
+    <div class="btnrow col"><button class="btn primary" data-act="health-go">${HEALTH_KINDS[HEALTH_KIND].go}</button></div>`);
+}
+function healthNoSheet() {
+  sheet(`<span class="eyebrow">Nicht freigegeben</span><h2>Bis zur Freigabe gesperrt</h2>
+    <ul class="dots"><li>Vault mit deinen Fortschrittsbildern</li><li>Körpergewicht eintragen</li><li>Angabe der Trainingspause „Krank“ oder „Verletzt“. Urlaub und Sonstiges gehen weiterhin.</li></ul>
+    <p class="muted" style="margin:0">Alles andere läuft wie gewohnt: Training, Plan, Crew, Chat und Spots.</p>
+    <span class="small muted">Freigeben kannst du jederzeit unter Einstellungen → Privatsphäre oder über die Vault-Karte im Profil.</span>
+    <div class="btnrow col"><button class="btn primary" data-act="health-nook">Verstanden</button></div>`);
 }
 let HEALTH_NEXT = null;
 function healthWithdrawSheet() {
@@ -5663,7 +5686,7 @@ const actions = {
   'discard-ask': () => discardSheet(),
   'discard-yes': () => { TIMER = null; clearTimeout(tmrTO); draft = null; saveDraft(); $('#modal').innerHTML = ''; toast('Training verworfen'); location.hash = '#start'; },
   'bw-save': () => {
-    if (!hasConsent('health')) { healthSheet(() => actions['bw-save']()); return; }
+    if (!hasConsent('health')) { healthSheet(() => actions['bw-save'](), 'bw'); return; }
     const el = $('#bw-in'), v = num(el && el.value), fe = $('#bw-from');
     let from = fe && /^\d{4}-\d{2}-\d{2}$/.test(fe.value) ? fe.value : todayStr();
     if (from > todayStr()) from = todayStr();
@@ -5733,10 +5756,14 @@ const actions = {
   'goal-open': () => goalSheet(),
   'goal-pick': t => { document.querySelectorAll('.wzb').forEach(b => { const on = b === t; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); const s = $('[data-act="goal-save"]'); if (s) s.dataset.v = t.dataset.v; },
   'goal-save': async t => { const n = int(t.dataset.v); closeModal(); const r = await sb.rpc('set_week_goal', { n }); if (r.error) { toast('Speichern hat nicht geklappt.'); return; } toast(r.data ? `Neues Wochenziel ${n} gilt ab Montag` : `Wochenziel: ${n}`); await sync({ quiet: true }); render(); },
-  'health-yes': async () => { const ok = await setConsent('health', true); closeModal(); if (ok) { toast('Danke. Gesundheitsdaten werden gespeichert.'); const n = HEALTH_NEXT; HEALTH_NEXT = null; if (n) n(); else render(); } },
-  'health-ask': () => healthSheet(() => render()),
+  'health-yes': async () => { const ok = await setConsent('health', true); if (ok) healthOkSheet(); else closeModal(); },
+  'health-go': () => { closeModal(); toast('Danke. Gesundheitsdaten werden gespeichert.'); const n = HEALTH_NEXT; HEALTH_NEXT = null; if (n) n(); else render(); },
+  'health-no': async () => { await setConsent('health', false); lockVault(); healthNoSheet(); },
+  'health-nook': () => { closeModal(); HEALTH_NEXT = null; if (HEALTH_KIND === 'pause') { if (PZS) PZS.reason = ''; pauseSheet(); } else if (view.startsWith('vault')) location.hash = '#profil'; else render(); },
+  'vault-locked': () => healthSheet(() => { location.hash = '#vault'; }, 'vault'),
+  'health-ask': () => healthSheet(() => render(), 'general'),
   'health-withdraw': () => healthWithdrawSheet(),
-  'health-keep': async () => { closeModal(); if (await setConsent('health', false)) { toast('Widerrufen. Neue Einträge werden nicht mehr gespeichert.'); render(); } },
+  'health-keep': async () => { closeModal(); if (await setConsent('health', false)) { lockVault(); toast('Widerrufen. Neue Einträge werden nicht mehr gespeichert.'); render(); } },
   'health-del': () => healthDeleteAll(),
   'stats-yes': async () => { closeModal(); if (await setConsent('analytics', true)) toast('Danke fürs Mithelfen'); },
   'stats-no': async () => { closeModal(); await setConsent('analytics', false); },

@@ -6,7 +6,7 @@
 @font-face { font-family: "Geist"; src: url("fonts/geist.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 @font-face { font-family: "Geist Mono"; src: url("fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 :root {
-  --bg: #000; --fg: #fff; --dim: rgba(255,255,255,.66); --faint: rgba(255,255,255,.42); --line: rgba(255,255,255,.18);
+  --bg: #000; --fg: #fff; --dim: #a8a8a8; --faint: #6b6b6b; --line: rgba(255,255,255,.18);
   --g1: rgba(255,255,255,.13); --g2: rgba(255,255,255,.045); --gline: rgba(255,255,255,.2);
   --y: #fff200; --m: #ec008c; --c: #00aeef; --g: #3fd16b; --r: #ff4d3d; --v: #9b7bff; --danger: #ff5aa8; --warn: #ffc15a;
   --tone: #fff; --tone-ink: #000;
@@ -1185,3 +1185,10 @@ img.pz-gray { filter: grayscale(1) brightness(.8); }
 .rb { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; flex: none; cursor: pointer; padding: 0; background: transparent; color: var(--fg); border: 1px solid rgba(255,255,255,.35); }
 .rb svg { width: 18px; height: 18px; }
 .rb.ok { background: var(--fg); color: #000; border-color: var(--fg); }
+
+/* 3.6: gesperrter Vault (Einwilligung abgelehnt) */
+button.vaultcard { width: 100%; font: inherit; cursor: pointer; }
+.vaultcard.locked { border-color: rgba(255,255,255,.18); color: #a8a8a8; }
+.vaultcard.locked b { color: #a8a8a8; }
+.vaultcard.locked .ic { position: relative; color: #a8a8a8; border-style: dashed; border-color: #666; }
+.vaultcard.locked .ic .slash { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
