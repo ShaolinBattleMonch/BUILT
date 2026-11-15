@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.5.0';
+const APP_VERSION = '3.5.1';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -913,8 +913,9 @@ function improvements(e) {
     else if (en.type === 'tr') { const a = score('tr', en.sets), b = score('tr', last.sets), dt = Math.floor(a / 1000) - Math.floor(b / 1000); label = dt > 0 ? `+${dt} s` : `+${a % 1000 - b % 1000} Wdh.`; }
     else {
       const dW = Math.round((workW(en.sets) - workW(last.sets)) * 100) / 100;
+      // 3.5.1: mehr Gewicht → „+2,5 kg“; gleiches Gewicht → mehr Wiederholungen beim schwersten Gewicht, „+2 Wdh. × 60 kg“
       if (dW > 0) label = `+${fmtN(dW)} kg`;
-      else { const dr = sum(en.sets.map(s => s.r)) - sum(last.sets.map(s => s.r)); label = dr > 0 ? `+${dr} Wdh.` : 'mehr geschafft'; }
+      else { const w = workW(en.sets), dr = cur % 1000 - score(last.type, last.sets) % 1000; label = `+${dr} Wdh.${w ? ` × ${fmtN(w)} kg` : ''}`; }
     }
     out.push({ name: en.name, exId: en.exId, label, pr: cur > best });
   });
@@ -3318,7 +3319,7 @@ function feedWorkout(e) {
       <a class="fi-link" href="#training-log:${encodeURIComponent(e.id)}"><div class="t"><span class="day t-${DAY_TONE[d.day]}">${esc(wlabel(e))}</span><span><b>${me ? 'Du' : nm(p)}</b> ${me ? 'hast' : 'hat'} ${ab ? 'abgebrochen' : 'abgeschlossen'}</span></div>
       <div class="m">${fmtDate(e.ts)} · ${fmtTime(e.ts)} · ${duration(d.start, d.end)}</div></a>
       <div class="fi-l2"><span class="muted">${ab ? `${ab.done} von ${ab.plan} Sätzen` : `${n} ${n === 1 ? 'Satz' : 'Sätze'}`}</span>${d.deload ? '<span class="chip dl">Deload</span>' : ''}${recBtn}${wait}</div>
-      ${open ? `<div class="fi-recs">${prs.map(i => `<div><span>${esc(i.name.replace(/\s*\(.*\)$/, ''))}</span><span class="mono" style="color:${col}">${esc(i.label)}</span></div>`).join('')}</div>` : ''}
+      ${open ? `<ul class="rl fi-recs">${prs.map(i => `<li><span class="rn">${esc(i.name.replace(/\s*\(.*\)$/, ''))}</span><span class="rv" style="color:${col}">${esc(i.label)}</span></li>`).join('')}</ul>` : ''}
       ${(() => { // Crew-Notizen zu diesem Training gebündelt, private nie
         const k = liveNotes().filter(x => x.workout_id === e.id && x.scope === 'crew' && x.user_id === p).length;
         return k ? `<a class="fi-notes" href="#training-log:${encodeURIComponent(e.id)}">${ICON_CREW14}${me ? 'Du hast' : nm(p) + ' hat'} ${k === 1 ? 'eine Notiz' : k + ' Notizen'} geschrieben</a>` : ''; })()}
@@ -4201,7 +4202,7 @@ function viewWorkout(id) {
       <div class="mono muted small">${fmtDate(e.ts)}, ${fmtTime(d.start)}–${fmtTime(d.end)} · ${duration(d.start, d.end)}${d.deload ? ' · Deload' : ''}</div>
       ${e.abort ? `<span class="chip" style="align-self:flex-start">Abgebrochen · ${e.abort.done} von ${e.abort.plan} Sätzen</span>` : ''}
       ${(() => { const prs = imp.filter(i => i.pr), rest = imp.filter(i => !i.pr), col = TONE_HEX[DAY_TONE[d.day]];
-        return (prs.length ? `<section class="card wrecs" style="border-color:${col}"><span class="wrecs-h" style="color:${col}">${ICON.trophy}${prs.length === 1 ? 'Rekord' : prs.length + ' Rekorde'}</span>${prs.map(i => `<div><span>${esc(i.name)}</span><span class="mono" style="color:${col}">${esc(i.label)}</span></div>`).join('')}</section>` : '')
+        return (prs.length ? `<section class="card wrecs" style="border-color:${col}"><span class="wrecs-h" style="color:${col}">${ICON.trophy}${prs.length === 1 ? 'Rekord' : prs.length + ' Rekorde'}</span><ul class="rl">${prs.map(i => `<li><span class="rn">${esc(i.name)}</span><span class="rv" style="color:${col}">${esc(i.label)}</span></li>`).join('')}</ul></section>` : '')
           + (rest.length ? `<div class="chips">${rest.map(i => `<span class="chip">${esc(i.name)} ${esc(i.label)}</span>`).join('')}</div>` : ''); })()}</div>
     ${d.edited ? `<span class="small muted">Nachträglich bearbeitet${d.editedBy && d.editedBy !== e.person ? ` von ${d.editedBy === cfg.me ? 'dir' : esc(d.editedBy)}` : ''} am ${fmtDate(d.edited)}, ${fmtTime(d.edited)}</span>` : ''}
     <section class="card">${d.entries.map(en => `<a class="sess" href="#uebung:${encodeURIComponent(en.exId)}"><div class="top"><b style="color:var(--fg)">${esc(en.name)}${en.from ? ` <span class="small muted" style="font-weight:400">statt ${esc(en.from.name)}</span>` : ''}</b><span class="mono">${en.sets.length} ${en.sets.length === 1 ? 'Satz' : 'Sätze'}</span></div>
@@ -4335,7 +4336,7 @@ function viewProfile(p) {
   const bid = (PROFILES[p] || {}).buddy_id;
   const idLine = own && bid ? `<button data-act="acct-copy" style="background:none;border:0;color:#fff;padding:2px 0;display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:-4px" aria-label="Buddy-ID ${esc(bid)} kopieren"><span class="mono" style="font-size:16px;font-weight:700;letter-spacing:.08em">#${esc(bid)}</span>${ICON.copy.replace(/18/g, '16')}</button>` : '';
   const goal = weekGoal(p), wkN = ws.filter(w => weekOf(w.ts) === weekOf(Date.now())).length, pzD = own ? pauseDaysInWeek(p, weekOf(Date.now())) : 0, eGoal = own ? effGoal(p, weekOf(Date.now())) : goal;
-  const ring = `<div class="pf-ring">${avatar(p, 114)}${own ? `<button class="pf-qr" data-act="id-sheet" aria-label="Meinen QR-Code zeigen">${ICON.qr.replace(/20/g, '16')}</button>` : ''}${own ? `<label class="pf-cam" aria-label="Profilbild ändern">${ICON.cam.replace('width="22" height="22"', 'width="16" height="16"')}<input type="file" id="av-file" accept="image/*" hidden></label>` : ''}</div>`;
+  const ring = `<div class="pf-ring">${avatar(p, 114)}${own ? `<button class="pf-qr" data-act="id-sheet" aria-label="Meinen QR-Code zeigen">${ICON.qr}</button>` : ''}${own ? `<label class="pf-cam" aria-label="Profilbild ändern">${ICON.cam.replace('width="22" height="22"', 'width="20" height="20"')}<input type="file" id="av-file" accept="image/*" hidden></label>` : ''}</div>`;
   const bar = `<section class="card"><div class="rowbetween"><span class="eyebrow">Trainings nach Tag</span><span class="mono muted small">${tot}</span></div>
       <div class="daybar">${tot ? DAYS.map((d, i) => counts[i] ? `<i class="t-${DAY_TONE[d]}" style="flex:${counts[i]}"></i>` : '').join('') : ''}</div>
       <div class="legend mono">${DAYS.map((d, i) => counts[i] || pdays(p).includes(d) ? `<span>${esc(dl(d, p))} ${counts[i]}</span>` : '').join('')}</div></section>`;

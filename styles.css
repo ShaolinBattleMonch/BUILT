@@ -348,7 +348,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 .pf-ring { position: relative; width: 124px; height: 124px; border-radius: 50%; padding: 4px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.45); }
 .pf-ring .av { width: 114px; height: 114px; font-size: 40px; background: #111; border: 2px solid #000; }
 .pf-cam { position: absolute; right: -2px; bottom: 4px; width: 38px; height: 38px; border-radius: 50%; border: 3px solid #000; background: #fff; color: #000; display: grid; place-items: center; cursor: pointer; padding: 0; }
-.pf-cam svg { width: 16px; height: 16px; }
+.pf-cam svg, .pf-qr svg { width: 20px; height: 20px; }
 .pf h1 { font-size: 44px; }
 .daybar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 2px; background: rgba(255,255,255,.08); }
 .daybar i { display: block; background: var(--c1); min-width: 0; }
@@ -919,8 +919,13 @@ a.cs-mini { display: grid; }
 .fi-rec { background: none; border: 0; padding: 0; min-height: 32px; display: inline-flex; align-items: center; gap: 5px; font: 600 14px var(--body); cursor: pointer; }
 .fi-rec .chev { transition: transform .2s; }
 .fi-rec[aria-expanded="true"] .chev { transform: rotate(180deg); }
-.fi-recs { display: flex; flex-direction: column; gap: 4px; padding-top: 2px; font-size: 14px; }
-.fi-recs div, .wrecs div { display: flex; justify-content: space-between; gap: 12px; }
+.fi-recs { padding-top: 2px; }
+/* 3.5.1: Rekorde als Liste in Mono, links Übung mit Punkt, rechts der Rekord einzeilig */
+.rl { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: 28px; row-gap: 6px; font: 400 13px/1.35 var(--mono); }
+.rl li { display: contents; }
+.rl .rn { position: relative; padding-left: 16px; color: rgba(255,255,255,.9); }
+.rl .rn::before { content: ""; position: absolute; left: 3px; top: .55em; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.5); }
+.rl .rv { white-space: nowrap; }
 .wrecs { gap: 8px; margin-top: 4px; }
 .wrecs-h { display: flex; align-items: center; gap: 6px; font-weight: 700; }
 
