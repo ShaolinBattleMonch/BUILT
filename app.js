@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.5.1';
+const APP_VERSION = '3.5.2';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -915,7 +915,13 @@ function improvements(e) {
       const dW = Math.round((workW(en.sets) - workW(last.sets)) * 100) / 100;
       // 3.5.1: mehr Gewicht → „+2,5 kg“; gleiches Gewicht → mehr Wiederholungen beim schwersten Gewicht, „+2 Wdh. × 60 kg“
       if (dW > 0) label = `+${fmtN(dW)} kg`;
-      else { const w = workW(en.sets), dr = cur % 1000 - score(last.type, last.sets) % 1000; label = `+${dr} Wdh.${w ? ` × ${fmtN(w)} kg` : ''}`; }
+      else {
+        // Gleiches Gewicht: bester Satz zählt; sonst mehr Sätze mit diesem Gewicht. Ohne Gewicht oder mit Unterstützung keine kg-Angabe.
+        const w = workW(en.sets), top = ss => ss.filter(z => num(z.w) === w && int(z.r) > 0).map(z => int(z.r));
+        const A = top(en.sets), B = top(last.sets), dMax = Math.max(0, ...A) - Math.max(0, ...B), dN = A.length - B.length;
+        const kg = w > 0 ? ` × ${fmtN(w)} kg` : '';
+        label = dMax > 0 ? `+${dMax} Wdh.${kg}` : dN > 0 ? `+${dN} ${dN === 1 ? 'Satz' : 'Sätze'}${kg}` : `+${sum(A) - sum(B)} Wdh.${kg}`;
+      }
     }
     out.push({ name: en.name, exId: en.exId, label, pr: cur > best });
   });

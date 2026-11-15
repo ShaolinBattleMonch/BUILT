@@ -920,12 +920,12 @@ a.cs-mini { display: grid; }
 .fi-rec .chev { transition: transform .2s; }
 .fi-rec[aria-expanded="true"] .chev { transform: rotate(180deg); }
 .fi-recs { padding-top: 2px; }
-/* 3.5.1: Rekorde als Liste in Mono, links Übung mit Punkt, rechts der Rekord einzeilig */
-.rl { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: 28px; row-gap: 6px; font: 400 13px/1.35 var(--mono); }
-.rl li { display: contents; }
-.rl .rn { position: relative; padding-left: 16px; color: rgba(255,255,255,.9); }
+/* 3.5.2: Rekorde zweizeilig in Mono: Übung (mit … gekürzt), darunter der Rekord */
+.rl { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font: 400 13px/1.35 var(--mono); min-width: 0; }
+.rl li { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rl .rn { position: relative; padding-left: 16px; color: rgba(255,255,255,.9); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rl .rn::before { content: ""; position: absolute; left: 3px; top: .55em; width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.5); }
-.rl .rv { white-space: nowrap; }
+.rl .rv { padding-left: 16px; white-space: nowrap; }
 .wrecs { gap: 8px; margin-top: 4px; }
 .wrecs-h { display: flex; align-items: center; gap: 6px; font-weight: 700; }
 
