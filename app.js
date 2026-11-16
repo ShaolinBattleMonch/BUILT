@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.7.3';
+const APP_VERSION = '3.7.4';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -6365,14 +6365,17 @@ const RIM = (() => {
     for (const r of roots) { let x = r && r.parentElement; while (x && x !== document.body) { if (!REG.has(x) && x.hasAttribute('data-rim')) outer.add(x); x = x.parentElement; } }
     const out = boxes.map(b => { const s = cs(b); const bd = ['Top', 'Right', 'Bottom', 'Left'].every(sd => parseFloat(s['border' + sd + 'Width']) >= 1 && s['border' + sd + 'Style'] === 'solid'); return [b, surfOf(b), conic(b), bd, cs(b).position === 'static', b.matches(GLASS)]; });
     const outO = [...outer].map(b => [b, conic(b)]); const cntN = {};
-    const slow = roots.some(r => r && r.id === 'page');   // Seitenwechsel: langsame Überblendung
+    const swap = roots.some(r => r && r.id === 'page');   // Seitenwechsel: langsame Überblendung
+    if (swap) SWAPT = performance.now();
+    const slow = swap || (anim && performance.now() - SWAPT < 1200);   // Nachladen direkt nach dem Wechsel (z. B. Feed) bleibt langsam
     const set = (b, g, prev) => {
       if (anim && prev && prev !== g) { b.style.setProperty('--rg0', prev); if (slow) b.style.setProperty('--rimd', '1s'); else b.style.removeProperty('--rimd'); b.setAttribute('data-rimx', b.getAttribute('data-rimx') === 'a' ? 'b' : 'a'); clearTimeout(b._rimT); b._rimT = setTimeout(() => b.removeAttribute('data-rimx'), slow ? 1050 : 320); }
       b.style.setProperty('--rg', g);
     };
     for (const [b, s, g, bd, st, gl] of out) {
-      let prev = old.has(b) ? old.get(b) : OLDK.get(NEWK.get(b));
-      if (prev == null && NEWK.has(b)) { const k = semKey(b); cntN[k] = (cntN[k] || 0) + 1; prev = OLDS.get(k + '#' + cntN[k]); if (prev == null) prev = FADE0; }   // neu: von der feinen Grundlinie einblenden
+      // Seitenwechsel: neue Elemente nur über eindeutige Merkmale (Knopf-Aktion, Link, Bezeichnung) zuordnen, alles andere blendet von der Grundlinie ein
+      let prev = old.has(b) ? old.get(b) : (slow ? null : OLDK.get(NEWK.get(b)));
+      if (prev == null && NEWK.has(b)) { const k = semKey(b); if (!slow || k.split('|').slice(2).some(Boolean)) { cntN[k] = (cntN[k] || 0) + 1; prev = OLDS.get(k + '#' + cntN[k]); } if (prev == null) prev = FADE0; }   // neu: von der feinen Grundlinie einblenden
       set(b, g, prev); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b');
       if (/^(INPUT|TEXTAREA|SELECT|IMG)$/.test(b.tagName)) { b.setAttribute('data-rim-in', ''); continue; }   // Eingabefelder können keinen Ring als Pseudo-Element tragen
       if (gl) b.setAttribute('data-rim-g', ''); if (st) b.setAttribute('data-rim-rel', '');
@@ -6383,7 +6386,7 @@ const RIM = (() => {
     clearTimeout(SAVE); SAVE = setTimeout(saveCache, 1500);
     return out.length + outO.length;
   };
-  let SAVE = 0, PRE = null, PREWARM = false;
+  let SAVE = 0, PRE = null, PREWARM = false, SWAPT = -1e9;
   const run = (root = document.body) => update([root], false);
   // Unsichtbar vorberechnen: Seiten werden außerhalb des Bildschirms aufgebaut, die Ränder landen im Speicher
   const prewarm = (pages, width) => {
