@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.7.1';
+const APP_VERSION = '3.7.2';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -6364,13 +6364,15 @@ const RIM = (() => {
     const outer = new Set();
     for (const r of roots) { let x = r && r.parentElement; while (x && x !== document.body) { if (!REG.has(x) && x.hasAttribute('data-rim')) outer.add(x); x = x.parentElement; } }
     const out = boxes.map(b => { const s = cs(b); const bd = ['Top', 'Right', 'Bottom', 'Left'].every(sd => parseFloat(s['border' + sd + 'Width']) >= 1 && s['border' + sd + 'Style'] === 'solid'); return [b, surfOf(b), conic(b), bd, cs(b).position === 'static', b.matches(GLASS)]; });
-    const outO = [...outer].map(b => [b, conic(b)]);
+    const outO = [...outer].map(b => [b, conic(b)]); const cntN = {};
     const set = (b, g, prev) => {
       if (anim && prev && prev !== g) { b.style.setProperty('--rg0', prev); b.setAttribute('data-rimx', b.getAttribute('data-rimx') === 'a' ? 'b' : 'a'); clearTimeout(b._rimT); b._rimT = setTimeout(() => b.removeAttribute('data-rimx'), 320); }
       b.style.setProperty('--rg', g);
     };
     for (const [b, s, g, bd, st, gl] of out) {
-      set(b, g, old.has(b) ? old.get(b) : OLDK.get(NEWK.get(b))); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b');
+      let prev = old.has(b) ? old.get(b) : OLDK.get(NEWK.get(b));
+      if (prev == null && NEWK.has(b)) { const k = semKey(b); cntN[k] = (cntN[k] || 0) + 1; prev = OLDS.get(k + '#' + cntN[k]); if (prev == null) prev = FADE0; }   // neu: von der feinen Grundlinie einblenden
+      set(b, g, prev); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b');
       if (/^(INPUT|TEXTAREA|SELECT|IMG)$/.test(b.tagName)) { b.setAttribute('data-rim-in', ''); continue; }   // Eingabefelder können keinen Ring als Pseudo-Element tragen
       if (gl) b.setAttribute('data-rim-g', ''); if (st) b.setAttribute('data-rim-rel', '');
     }
@@ -6392,21 +6394,24 @@ const RIM = (() => {
   };
   // Beim Neuaufbau einer Seite: alte Ränder über die Position im Baum den neuen Elementen zuordnen
   const pathOf = (el, top) => { let p = ''; for (let x = el; x && x !== top.parentNode; x = x.parentElement) { let i = 0, y = x; while ((y = y.previousElementSibling)) i++; p = x.tagName + '.' + (x.getAttribute('class') || '') + ':' + i + '/' + p; } return p; };
-  let OLDK = new Map(), NEWK = new Map();
+  let OLDK = new Map(), NEWK = new Map(), OLDS = new Map(), NEWS = new Map();
+  // Elemente, die auf beiden Seiten vorkommen (Tab-Leiste, Knöpfe oben), über Merkmale wiederfinden
+  const semKey = el => [el.tagName, el.getAttribute('class') || '', el.id, el.getAttribute('href') || '', el.getAttribute('data-act') || '', el.getAttribute('data-v') || '', el.getAttribute('aria-label') || ''].join('|');
+  const FADE0 = 'linear-gradient(rgba(255,255,255,.1),rgba(255,255,255,.1))';
   const onMut = recs => {
-    const roots = new Set(); OLDK = new Map(); NEWK = new Map();
+    const roots = new Set(); OLDK = new Map(); NEWK = new Map(); OLDS = new Map(); NEWS = new Map(); const cntO = {}, cntN = {};
     recs.forEach((r, ri) => {
       const t = r.target.nodeType === 1 ? r.target : r.target.parentElement;
       if (!t || (PRE && PRE.contains(t))) return;
       roots.add(t);
       if (r.type !== 'childList') return;
-      [...r.removedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('[data-rim]')]) if (el.hasAttribute('data-rim')) OLDK.set(ri + '#' + i + '#' + pathOf(el, n), el.style.getPropertyValue('--rg')); });
+      [...r.removedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('[data-rim]')]) if (el.hasAttribute('data-rim')) { const g = el.style.getPropertyValue('--rg'), k = semKey(el); OLDK.set(ri + '#' + i + '#' + pathOf(el, n), g); cntO[k] = (cntO[k] || 0) + 1; OLDS.set(k + '#' + cntO[k], g); } });
       [...r.addedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('*')]) NEWK.set(el, ri + '#' + i + '#' + pathOf(el, n)); });
     });
     // nur die äußersten geänderten Stellen
     const list = [...roots].filter(x => ![...roots].some(y => y !== x && y.contains(x)));
     if (list.length) update(list);
-    OLDK = new Map(); NEWK = new Map();
+    OLDK = new Map(); NEWK = new Map(); OLDS = new Map();
   };
   const soon = e => { const t = e && e.target && e.target.nodeType === 1 ? e.target : null; if (e && e.animationName && /^rim/.test(e.animationName)) return; update([t && t !== window && t.closest ? (t.closest('[data-rim]') || t) : document.body]); };
   const start = () => {
