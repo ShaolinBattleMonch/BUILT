@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.6.0';
+const APP_VERSION = '3.7.0';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -456,7 +456,7 @@ function pushFlame() {
   flamePushing = true;
   sb.from('profiles').update({ flame: n, flame_week: wk }).eq('id', cfg.me).then(r => { flamePushing = false; if (!r.error) { pr.flame = n; pr.flame_week = wk; } }, () => { flamePushing = false; });
 }
-const flameImg = (p, size) => `<img src="${FLAME.W}" alt=""${pauseOn(p, todayStr()) ? ' class="pz-gray"' : ''}${size ? ` width="${size}" height="${size}"` : ''}>`;
+const flameImg = (p, size) => pauseOn(p, todayStr()) ? `<span class="pz-fl" aria-hidden="true"${size ? ` style="width:${size}px;height:${size}px"` : ''}>${ICON.hourglass}</span>` : `<img src="${FLAME.W}" alt=""${size ? ` width="${size}" height="${size}"` : ''}>`;
 /* Flammen-Liste: je Person Wochenflamme mit Streak, Antippen klappt die Tagesflammen auf */
 const FLAME_OPEN = new Set();
 function flameList() {
@@ -493,7 +493,7 @@ function viewDone(id) {
   items.sort((a, b) => (a.k < b.k ? -1 : a.k > b.k ? 1 : new Date(a.x.ts) - new Date(b.x.ts)));
   const slots = items.map(({ k, x, pz }) => pz
     ? `<div class="done-slot"><div class="pz-slot">${ICON.hourglass}</div><span class="eyebrow">Pause</span></div>`
-    : `<div class="done-slot${x.id === id ? ' cur' : ''}"><div class="glass${x.id === id ? ' new' : ''}${x.data.deload ? ' dl' : ''}${x.abort ? ' ab' : ''} t-${DAY_TONE[x.data.day]}"><img src="${FLAME[x.data.day]}" alt=""></div><span class="eyebrow" style="color:${TONE_HEX[DAY_TONE[x.data.day]]}">${esc(wlabel(x))}</span></div>`);
+    : `<div class="done-slot${x.id === id ? ' cur' : ''}"><div class="glass${x.id === id ? ' new' : ''}${x.data.deload ? ' dl' : ''}${x.abort ? ' ab' : ''} t-${DAY_TONE[x.data.day]}"><img src="${FLAME[x.data.day]}" alt="" data-glow="${TONE_HEX[DAY_TONE[x.data.day]]}"></div><span class="eyebrow" style="color:${TONE_HEX[DAY_TONE[x.data.day]]}">${esc(wlabel(x))}</span></div>`);
   for (let i = week.length; i < g; i++) slots.push('<div class="done-slot"><div class="empty-slot"></div><span class="eyebrow">·</span></div>');
   return `<div class="done">
     <div class="done-top"><span class="eyebrow">${esc(wd)} · KW ${isoWeek(w.ts)}</span><a class="iconbtn glass" href="#start" aria-label="Schließen">${ICON.x}</a></div>
@@ -2348,7 +2348,9 @@ function chatMsgsHTML(p) {
     const bub = `<div class="cbub">${chatQuote(m)}<span class="ctext">${esc(m.text)}</span></div>`;
     const body = m.spot ? `<div class="crep">${mine ? bub + chatSpotThumb(m.spot, m.spotOwner) : chatSpotThumb(m.spot, m.spotOwner) + bub}</div>` : bub;
     const name = `<span class="cname" style="color:${mine ? 'var(--fg)' : nameColor(m.from)}">${mine ? 'Du' : nm(m.from)}</span>`;
-    out += `<div class="cmsg ${mine ? 'me' : 'them'}" id="cm-${esc(m.id)}" data-mid="${esc(m.id)}">${name}${body}${chatReacts(m.id)}<span class="ctime">${fmtTime(ts)}${m.fail ? ' · nicht zugestellt' : m.pend ? ' · wird gesendet' : ''}</span></div>`;
+    const inner = `${name}${body}${chatReacts(m.id)}<span class="ctime">${fmtTime(ts)}${m.fail ? ' · nicht zugestellt' : m.pend ? ' · wird gesendet' : ''}</span>`;
+    out += mine ? `<div class="cmsg me" id="cm-${esc(m.id)}" data-mid="${esc(m.id)}">${inner}</div>`
+      : `<div class="cmsg them has-av" id="cm-${esc(m.id)}" data-mid="${esc(m.id)}"><span class="cav">${avatar(m.from, 28)}</span><div class="cmcol">${inner}</div></div>`;
   });
   return out || `<div class="empty" style="margin:auto 0 0">Schreib ${nm(p)} die erste Nachricht.</div>`;
 }
@@ -3191,7 +3193,7 @@ function viewStart() {
       ${dl_.active ? '<button class="btn ghost" data-act="start-normal">Heute normal trainieren</button>' : ''}
       ${otherDayAsk ? `<div class="confirm"><div><b>Welchen Tag trainierst du heute?</b><br><span class="small muted">Deine Rotation geht danach ab diesem Tag weiter.</span></div>
         <div class="excwarn">${ICON.warn}<span>Nur als Ausnahme: Häufiges Auslassen stört die Rotation und fördert muskuläres Ungleichgewicht.</span></div>
-        <div class="pick">${pdays(me, sk).filter(d => d !== nd).map(d => `<button data-act="start-day" data-v="${d}">${esc(dl(d, me, sk))}</button>`).join('')}</div>
+        <div class="chips scroll dpick" role="group" aria-label="Tag wählen">${pdays(me, sk).filter(d => d !== nd).map(d => `<button class="dchip" data-act="start-day" data-v="${d}"><i style="background:${TONE_HEX[DAY_TONE[d]]}"></i>${esc(dl(d, me, sk))}</button>`).join('')}</div>
         ${pdays(me, sk).filter(d => d !== nd).map(d => regenHint(d, true)).join('')}
         <button class="btn small ghost" data-act="other-no">Abbrechen</button></div>` : ''}
       ${otherDayAsk ? '' : `<button class="lnk" data-act="other-day" style="align-self:flex-start">Anderen Tag trainieren</button>`}`;
@@ -4349,7 +4351,7 @@ function viewProfile(p) {
       <div class="legend mono">${DAYS.map((d, i) => counts[i] || pdays(p).includes(d) ? `<span>${esc(dl(d, p))} ${counts[i]}</span>` : '').join('')}</div></section>`;
   if (own) {
     return `<div class="pf">${ring}<h1 class="display">${nm(p)}</h1>${idLine}<span class="mono muted small">${meta}</span></div>
-      <div class="stat2">
+      <div class="stat2 pstat">
         <div class="card"><span class="val">${tot}</span><span class="eyebrow">Trainings</span></div>
         <a class="card" href="#gewicht"><span class="val">${lb ? fmtN(lb.kg) + '<small> kg</small>' : '–'}</span><span class="eyebrow">Körpergewicht${pb ? ` · ${lb.kg - pb.kg >= 0 ? '+' : '−'}${fmtN(Math.abs(lb.kg - pb.kg))}` : ''}</span></a>
       </div>
@@ -4360,7 +4362,7 @@ function viewProfile(p) {
   }
   const recent = ws.slice().reverse().slice(0, 3);
   return `<div class="pf">${ring}<h1 class="display">${nm(p)}</h1><span class="mono muted small">${meta}${crewMates().includes(p) ? ' · in deiner Crew' : ''}</span></div>
-    <div class="stat2">
+    <div class="stat2 pstat">
       <div class="card"><span class="val">${tot}</span><span class="eyebrow">Trainings</span></div>
       <div class="card"><span class="val">${wkN}<small> / ${goal}</small></span><span class="eyebrow">Diese Woche</span></div>
     </div>
@@ -5371,7 +5373,7 @@ function viewSettings() {
     </section>
     <section class="card"><b>Abmelden</b>
       <span class="small muted">Meldet dieses Handy von deinem Konto ab und entfernt deine Trainingsdaten und Chats von diesem Handy. In deinem Konto bleibt alles erhalten. Der Vault bleibt verschlüsselt auf dem Handy.${waiting ? ` <b>${waiting} noch nicht gesendete Einträge gehen dabei verloren.</b>` : ''}</span>
-      ${logoutAsk ? `<div class="btnrow"><button class="btn small danger" data-act="logout-yes">Ja, abmelden</button><button class="btn small ghost" data-act="logout-no">Abbrechen</button></div>` : `<button class="btn ghost" data-act="logout-ask">Abmelden</button>`}
+      ${logoutAsk ? `<div class="btnrow"><button class="btn small danger" data-act="logout-yes">Ja, abmelden</button><button class="btn small ghost" data-act="logout-no">Abbrechen</button></div>` : `<button class="btn danger" data-act="logout-ask">Abmelden</button>`}
     </section>`;
 }
 const musOpen = new Set();
@@ -5406,7 +5408,7 @@ function viewSetup() {
       <div class="onb-legal"><a href="#rechtliches:impressum">Impressum</a><a href="#rechtliches:datenschutz">Datenschutz</a></div></div></div>`;
   if (s === 'email') return `<div class="onb">${onbHead('welcome', 1)}<div class="onb-body">
       <h1 class="display">Wie lautet deine E-Mail?</h1><p class="muted" style="margin:-8px 0 0">Deine Adresse sieht niemand außer dir, auch deine Freunde nicht.</p>
-      <label class="lbl">E-Mail-Adresse<input class="inp" id="onb-in" type="email" value="${esc(ONB.email)}" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" data-onb="email"></label>${onbErr()}</div>
+      <label class="lbl"><input class="inp" id="onb-in" type="email" placeholder="E-Mail-Adresse" aria-label="E-Mail-Adresse" value="${esc(ONB.email)}" autocomplete="email" inputmode="email" autocapitalize="off" spellcheck="false" data-onb="email"></label>${onbErr()}</div>
     <div class="onb-cta"><p>Neu hier oder schon dabei: Der Weg ist derselbe.</p>${onbBtn('onb-send', 'Code senden')}</div></div>`;
   if (s === 'code') return `<div class="onb">${onbHead('email', 2)}<div class="onb-body">
       <h1 class="display">Code eingeben</h1><p class="muted" style="margin:-8px 0 0">Wir haben einen Code an <b style="color:var(--fg)">${esc(ONB.email)}</b> geschickt. Er ist 10 Minuten gültig.</p>
@@ -6197,9 +6199,158 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; if (draft) saveDraft(); location.reload(); } });
 }
 
+/* RIMLIGHT-START · Randlicht mit Schatten: Elemente einer Box strahlen in ihrer Farbe auf den 1-px-Rand */
+const RIM = (() => {
+  const GLASS = '.glass,.card,.hero-glass,.tabbar,.iconbtn,.seg,.sheet,.savebar,.trainbar,.rot,article.ex';
+  const CI = [[255, 242, 0], [236, 0, 140], [0, 174, 239], [63, 209, 107], [255, 77, 61], [155, 123, 255], [255, 79, 181]];
+  const LAM = 10, K = 5; let FLOOR = .1;
+  const parse = c => { const m = c && c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const v = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 }; };
+  const lumOf = c => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
+  const isCI = c => (Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b)) < 20 || CI.some(k => Math.hypot(c.r - k[0], c.g - k[1], c.b - k[2]) < 45);
+  let CS = new Map(); const MC = document.createElement('canvas').getContext('2d');
+  const cs = el => { let v = CS.get(el); if (!v) { v = getComputedStyle(el); CS.set(el, v); } return v; };
+  // Graue Tönung: dezente neutrale Flächen (hell oder abdunkelnd) und weiße Glasverläufe ohne Glas-Klasse
+  const NOTINT = '.tgl i,.check,.av,.bar,.daybar,.ld-track,.segs i,.sv-bars i,.photo,.cam-th,.sgrid a,.cs-mini,.cs-spot,.fi-th,.scan,.zstage,.rbub,.pf-ring,.tool,.shutter,.mlab,.dot,.vdot,.badge,.cm,img,svg,video,canvas,select,option,#bg,#bg *,.cm-ov,.cm-ov *,.sv-emo *,.sp-text';
+  let TINT = new Set();
+  const isTint = el => {
+    if (el.matches(GLASS) || el.matches(NOTINT) || el.closest('.av,svg,.norim')) return false;
+    const s = cs(el); if (s.display === 'none') return false;
+    const bi = s.backgroundImage;
+    if (bi !== 'none') return /^linear-gradient\(rgba\(255, 255, 255, 0?\.\d+\), rgba\(255, 255, 255, 0?\.\d+\)\)$/.test(bi.replace(/180deg, /, ''));
+    const c = parse(s.backgroundColor); if (!c || c.a <= 0) return false;
+    if ((Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b)) > 16) return false;
+    const eff = lumOf(c) * c.a;
+    return (c.a < 1 && Math.max(c.r, c.g, c.b) < 40) || (eff >= .015 && eff <= .14);
+  };
+  const glassSurf = () => ({ r: 0, g: 0, b: 0 });   // keine graue Tönung: Flächen schwarz, nur der Rand leuchtet
+  // Fläche unter dem Element: eigene Farbe über den Farben der Eltern (Glas zählt als #090909)
+  const surfOf = el => {
+    if (el.matches(GLASS)) { const g = glassSurf(el); return `rgb(${g.r},${g.g},${g.b})`; }
+    const layers = []; let x = el;
+    while (x && x.nodeType === 1) {
+      if (x !== el && x.matches(GLASS)) { layers.push({ ...glassSurf(x), a: 1 }); break; }
+      if (TINT.has(x)) { x = x.parentElement; continue; }
+      const c = parse(cs(x).backgroundColor); if (c && c.a > 0) { layers.push(c); if (c.a >= 1) break; }
+      x = x.parentElement;
+    }
+    let r = 0, g = 0, b = 0;
+    for (let i = layers.length - 1; i >= 0; i--) { const c = layers[i]; r = r * (1 - c.a) + c.r * c.a; g = g * (1 - c.a) + c.g * c.a; b = b * (1 - c.a) + c.b * c.a; }
+    return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+  };
+  const isBox = el => {
+    const s0 = cs(el), bg0 = parse(s0.backgroundColor);
+    if (bg0 && bg0.a > .5 && lumOf(bg0) > .3) return false;   // helle, gefüllte Knöpfe behalten ihren Look
+    if (el.matches('.cd.sel,.cd.today')) return false;   // Auswahl und heute im Kalender behalten ihren Rahmen
+    if (el.matches(GLASS)) return s0.display !== 'none';
+    if (TINT.has(el)) {
+      const q = el.getBoundingClientRect(), bc0 = parse(s0.borderTopColor), bw0 = parseFloat(s0.borderTopWidth) >= 1 && s0.borderTopStyle !== 'none';
+      if (bw0 && bc0 && bc0.a > .5 && ((Math.max(bc0.r, bc0.g, bc0.b) - Math.min(bc0.r, bc0.g, bc0.b)) / 255 > .3 || lumOf(bc0) > .8)) return false;   // Markierung (Stufe, heute) bleibt
+      return q.width >= 24 && q.height >= 24 && parseFloat(s0.borderTopLeftRadius) >= 6 && s0.borderTopStyle !== 'dashed';
+    }
+    if (el === document.activeElement || el.closest('.av,svg,.norim')) return false;
+    const s = cs(el);
+    for (const sd of ['Top', 'Right', 'Bottom', 'Left']) if (!(parseFloat(s['border' + sd + 'Width']) >= 1) || s['border' + sd + 'Style'] !== 'solid') return false;
+    const bc = parse(s.borderTopColor); if (!bc || bc.a < .05) return false;
+    if ((Math.max(bc.r, bc.g, bc.b) - Math.min(bc.r, bc.g, bc.b)) / 255 > .3 && bc.a > .5) return false;   // farbige Markierung (z. B. neue Stufe) bleibt sichtbar
+    if (s.backgroundImage !== 'none') return false;
+    const bg = parse(s.backgroundColor); if (bg && bg.a > .5 && lumOf(bg) > .3) return false;   // helle, gefüllte Knöpfe behalten ihren Look
+    if (s.display === 'none' || s.visibility === 'hidden') return false;
+    const q = el.getBoundingClientRect(); return q.width >= 16 && q.height >= 16;
+  };
+  const conic = box => {
+    const R = box.getBoundingClientRect();
+    const em = [];
+    const vis = (el, q) => {
+      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) return null;
+      let x = el, op = 1, l = q.left, t = q.top, r = q.right, b = q.bottom;
+      while (x && x !== box.parentElement) { const c = cs(x); op *= +c.opacity; if (x !== el && c.overflow !== 'visible') { const z = x.getBoundingClientRect(); l = Math.max(l, z.left); t = Math.max(t, z.top); r = Math.min(r, z.right); b = Math.min(b, z.bottom); } x = x.parentElement; }
+      if (op < .05 || r - l < 1 || b - t < 1) return null; return { x0: l, y0: t, x1: r, y1: b, op };
+    };
+    const push = (el, q, c, w) => {
+      if (!el.hasAttribute('data-glow') && el.closest('.av,img,.cm,.noglow')) return; if (!isCI(c)) return;
+      const sat = (Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b)) / 255, lum = lumOf(c);
+      w *= 0.3 + 1.3 * lum + 2 * sat; if (sat < .08 && lum < .8) w *= .35;
+      const v = vis(el, q); if (v) em.push({ x0: v.x0, y0: v.y0, x1: v.x1, y1: v.y1, c, w: w * v.op * Math.sqrt(((v.x1 - v.x0) * (v.y1 - v.y0)) / (q.width * q.height)) });
+    };
+    const tw = document.createTreeWalker(box, NodeFilter.SHOW_TEXT); let tn; const rg = document.createRange();
+    while ((tn = tw.nextNode())) {
+      if (!tn.textContent.trim()) continue; const pe = tn.parentElement; const c = parse(cs(pe).color); if (!c) continue;
+      rg.selectNodeContents(tn); for (const q of rg.getClientRects()) if (q.width > 1) push(pe, q, c, Math.sqrt(q.width * q.height * 0.6) * c.a);
+    }
+    // Eingabefelder: Wert (oder Platzhalter) strahlt wie Text
+    for (const el of [box, ...box.querySelectorAll('input,textarea')]) {
+      if (!/^(INPUT|TEXTAREA)$/.test(el.tagName) || /^(checkbox|radio|hidden|range|file)$/.test(el.type)) continue;
+      const v = el.value || el.getAttribute('value') || '', ph = el.getAttribute('placeholder') || '', txt = v || ph; if (!txt.trim()) continue;
+      const s = cs(el), q = el.getBoundingClientRect(); let c = parse(s.color); if (!c) continue;
+      if (!v) c = { r: 255, g: 255, b: 255, a: .6 };   // Platzhalter strahlt gedämpft weiß
+      const fs = parseFloat(s.fontSize) || 16, h = Math.min(q.height, fs * 1.1);
+      MC.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`; const w = Math.min(q.width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), MC.measureText(txt).width);
+      const x0 = s.textAlign === 'right' || s.textAlign === 'end' ? q.right - parseFloat(s.paddingRight) - w : q.left + parseFloat(s.paddingLeft), y0 = q.top + (q.height - h) / 2;
+      push(el, { left: x0, top: y0, right: x0 + w, bottom: y0 + h, width: w, height: h }, c, Math.sqrt(w * h * 0.6) * c.a * (v ? 1.4 : .4));
+    }
+    // Bilder mit Tagesfarbe (z. B. Flammen) strahlen in dieser Farbe
+    for (const el of box.querySelectorAll('[data-glow]')) { const q = el.getBoundingClientRect(), c = parse(el.getAttribute('data-glow').replace(/^#(..)(..)(..)$/, (m, a, b, d) => `rgb(${parseInt(a, 16)},${parseInt(b, 16)},${parseInt(d, 16)})`)); if (c && q.width > 2) { const w = q.width * .5, h = q.height * .4, x0 = q.left + (q.width - w) / 2, y0 = q.top + q.height * .5; push(el, { left: x0, top: y0, right: x0 + w, bottom: y0 + h, width: w, height: h }, c, Math.sqrt(w * h) * .55 * (+cs(el).opacity || 1)); } }   // Flamme: Leuchtkern unten in der Mitte des Bildes
+    for (const el of box.querySelectorAll('*')) {
+      const q = el.getBoundingClientRect(); if (q.width < 2 || q.height < 2) continue;
+      const s = cs(el), bg = parse(s.backgroundColor);
+      if (bg && bg.a > .5 && s.backgroundImage === 'none' && q.width * q.height < R.width * R.height * .6) push(el, q, bg, Math.sqrt(q.width * q.height) * bg.a);
+      if (el.tagName === 'svg') { const c = parse(s.color); if (c) push(el, q, c, Math.sqrt(q.width * q.height) * .45 * c.a); }
+    }
+    const cx = R.left + R.width / 2, cy = R.top + R.height / 2;
+    const rad = Math.min(parseFloat(cs(box).borderTopLeftRadius) || 0, R.width / 2, R.height / 2);
+    const N = Math.max(48, Math.min(180, Math.round((R.width + R.height) / 2 / 2) * 2)), pts = [];
+    for (let i = 0; i < N; i++) {
+      const ang = i / N * 2 * Math.PI, dx = Math.sin(ang), dy = -Math.cos(ang);
+      const tx = dx ? (R.width / 2) / Math.abs(dx) : 1e9, ty = dy ? (R.height / 2) / Math.abs(dy) : 1e9, tt = Math.min(tx, ty);
+      let px = cx + dx * tt, py = cy + dy * tt;
+      const kx = Math.max(R.left + rad, Math.min(R.right - rad, px)), ky = Math.max(R.top + rad, Math.min(R.bottom - rad, py));
+      const nx = px - kx, ny = py - ky, nl = Math.hypot(nx, ny);
+      if (nl > rad && rad > 0) { px = kx + nx / nl * rad; py = ky + ny / nl * rad; }
+      let ox = 0, oy = 0;
+      if (nl > 0.01 && rad > 0 && (Math.abs(px - kx) > .01 || Math.abs(py - ky) > .01)) { ox = px - kx; oy = py - ky; } else if (tx < ty) ox = Math.sign(dx); else oy = Math.sign(dy);
+      const ol = Math.hypot(ox, oy) || 1; ox /= ol; oy /= ol;
+      const base = Math.max(0, -0.7071 * ox - 0.7071 * oy), bI = 0.75 * Math.pow(base, 2.4);
+      const qb = bI * bI; let r = 255 * qb, g = 255 * qb, bl = 255 * qb, I = bI, Q = qb;
+      for (const e of em) {
+        const ex = Math.max(e.x0, Math.min(e.x1, px)), ey = Math.max(e.y0, Math.min(e.y1, py)), d = Math.hypot(px - ex, py - ey);
+        const f = e.w / K / (1 + (d / LAM) ** 2), q2 = f * f; r += e.c.r * q2; g += e.c.g * q2; bl += e.c.b * q2; Q += q2; I += f;
+      }
+      const a = Math.max(FLOOR, Math.pow(1 - Math.exp(-I * 0.9), 2.4)), s = Q > 0 ? 1 / Q : 0;
+      if (!(Q > 1e-9)) { r = g = bl = 255; } const k2 = Q > 1e-9 ? s : 1;
+      pts.push(`rgba(${Math.round(Math.min(255, r * k2))},${Math.round(Math.min(255, g * k2))},${Math.round(Math.min(255, bl * k2))},${a.toFixed(2)}) ${(i / N * 360).toFixed(1)}deg`);
+    }
+    pts.push(pts[0].replace(/ [\d.]+deg$/, ' 360deg'));
+    return `conic-gradient(${pts.join(',')})`;
+  };
+  const run = (root = document.body) => {
+    CS = new Map();
+    for (const el of root.querySelectorAll('[data-rim],[data-tint]')) for (const k of ['data-rim', 'data-tint', 'data-rim-g', 'data-rim-rel', 'data-rim-in']) el.removeAttribute(k);
+    const all = [...root.querySelectorAll('*')];
+    TINT = new Set(all.filter(isTint));
+    const boxes = all.filter(isBox);
+    const bset = new Set(boxes);
+    const out = boxes.map(b => { const s = cs(b); const bd = ['Top', 'Right', 'Bottom', 'Left'].every(sd => parseFloat(s['border' + sd + 'Width']) >= 1 && s['border' + sd + 'Style'] === 'solid'); return [b, surfOf(b), conic(b), bd]; });
+    const pos = out.map(([b]) => cs(b).position === 'static'), gl = out.map(([b]) => b.matches(GLASS));
+    out.forEach(([b, s, g, bd], i) => { b.style.setProperty('--rg', g); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b'); if (/^(INPUT|TEXTAREA|SELECT|IMG)$/.test(b.tagName)) { b.setAttribute('data-rim-in', ''); return; } if (gl[i]) b.setAttribute('data-rim-g', ''); if (pos[i]) b.setAttribute('data-rim-rel', ''); });   // Eingabefelder können keinen Ring als Pseudo-Element tragen
+    for (const el of TINT) el.setAttribute('data-tint', '');
+    CS = new Map(); TINT = new Set(); return out.length;
+  };
+  let tm = 0, last = 0;
+  const soon = () => { if (tm) return; tm = setTimeout(() => { tm = 0; const wait = 600 - (Date.now() - last); if (wait > 0) { tm = setTimeout(() => { tm = 0; soon(); }, wait); return; } last = Date.now(); requestAnimationFrame(() => run()); }, 120); };
+  const start = () => {
+    new MutationObserver(soon).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded', 'hidden', 'open', 'disabled', 'src'] });
+    addEventListener('resize', soon); addEventListener('focusin', soon); addEventListener('focusout', soon); addEventListener('change', soon); addEventListener('transitionend', soon); addEventListener('animationend', soon);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(soon);
+    soon();
+  };
+  return { run, soon, start, set floor(v) { FLOOR = v; } };
+})();
+/* RIMLIGHT-END */
+
 try { draft = normalizeDraft(draft); } catch (e) { draft = null; }
 if (location.hash === '#spot' || location.hash === '#spots') location.hash = '#start';
 if (cfg.me) loadChat();
 render();
+RIM.start();
 loadSpots().then(() => { if (cfg.me && ['start', 'kamera', 'profil', 'spot-bild'].includes(view)) render(); if (cfg.me && cfg.url && !syncing) spotSync(); });
 if (cfg.me && cfg.url) sync({ overlay: true });
