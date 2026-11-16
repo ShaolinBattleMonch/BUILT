@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.7.0';
+const APP_VERSION = '3.7.1';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -6207,6 +6207,9 @@ const RIM = (() => {
   const parse = c => { const m = c && c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const v = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return { r: v[0], g: v[1], b: v[2], a: v.length > 3 ? v[3] : 1 }; };
   const lumOf = c => (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
   const isCI = c => (Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b)) < 20 || CI.some(k => Math.hypot(c.r - k[0], c.g - k[1], c.b - k[2]) < 45);
+  const CACHE = new Map(); let DIRTYC = false, REG = new Set();
+  try { for (const [k, v] of JSON.parse(localStorage.getItem('built.rim') || '[]')) CACHE.set(k, v); } catch (e) {}
+  const saveCache = () => { if (!DIRTYC) return; DIRTYC = false; try { localStorage.setItem('built.rim', JSON.stringify([...CACHE].slice(-160))); } catch (e) {} };
   let CS = new Map(); const MC = document.createElement('canvas').getContext('2d');
   const cs = el => { let v = CS.get(el); if (!v) { v = getComputedStyle(el); CS.set(el, v); } return v; };
   // Graue Tönung: dezente neutrale Flächen (hell oder abdunkelnd) und weiße Glasverläufe ohne Glas-Klasse
@@ -6229,7 +6232,7 @@ const RIM = (() => {
     const layers = []; let x = el;
     while (x && x.nodeType === 1) {
       if (x !== el && x.matches(GLASS)) { layers.push({ ...glassSurf(x), a: 1 }); break; }
-      if (TINT.has(x)) { x = x.parentElement; continue; }
+      if (TINT.has(x) || (!REG.has(x) && x.hasAttribute('data-tint'))) { x = x.parentElement; continue; }
       const c = parse(cs(x).backgroundColor); if (c && c.a > 0) { layers.push(c); if (c.a >= 1) break; }
       x = x.parentElement;
     }
@@ -6257,45 +6260,68 @@ const RIM = (() => {
     if (s.display === 'none' || s.visibility === 'hidden') return false;
     const q = el.getBoundingClientRect(); return q.width >= 16 && q.height >= 16;
   };
+  // Je Element einmal pro Durchgang: eigene Lichtquellen und die Kette aus Deckkraft/Zuschnitt der Eltern
+  let RAW = new Map(), CHAIN = new Map();
+  const weigh = (c, w) => { const sat = (Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b)) / 255, lum = lumOf(c); w *= 0.3 + 1.3 * lum + 2 * sat; if (sat < .08 && lum < .8) w *= .35; return w; };
+  const rawOf = el => {
+    let v = RAW.get(el); if (v) return v; v = [];
+    const add = (q, c, w, bg) => { if (!isCI(c)) return; v.push({ q, c, w: weigh(c, w), bg, area: q.width * q.height }); };
+    const glow = el.hasAttribute('data-glow'), ex = !glow && el.closest('.av,img,.cm,.noglow');
+    if (!ex) {
+      const s = cs(el);
+      for (const tn of el.childNodes) if (tn.nodeType === 3 && tn.textContent.trim()) { const c = parse(s.color); if (!c) break; const rg = document.createRange(); rg.selectNodeContents(tn); for (const q of rg.getClientRects()) if (q.width > 1) add(q, c, Math.sqrt(q.width * q.height * 0.6) * c.a); }
+      const q = el.getBoundingClientRect();
+      if (q.width >= 2 && q.height >= 2) {
+        const bg = parse(s.backgroundColor);
+        if (bg && bg.a > .5 && s.backgroundImage === 'none') add(q, bg, Math.sqrt(q.width * q.height) * bg.a, true);
+        if (el.tagName === 'svg') { const c = parse(s.color); if (c) add(q, c, Math.sqrt(q.width * q.height) * .45 * c.a); }
+      }
+      if (/^(INPUT|TEXTAREA)$/.test(el.tagName) && !/^(checkbox|radio|hidden|range|file)$/.test(el.type)) {
+        const val = el.value || el.getAttribute('value') || '', ph = el.getAttribute('placeholder') || '', txt = val || ph;
+        let c = parse(s.color);
+        if (txt.trim() && c) {
+          if (!val) c = { r: 255, g: 255, b: 255, a: .6 };   // Platzhalter strahlt gedämpft weiß
+          const fs = parseFloat(s.fontSize) || 16, h = Math.min(q.height, fs * 1.1);
+          MC.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`; const w = Math.min(q.width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), MC.measureText(txt).width);
+          const x0 = s.textAlign === 'right' || s.textAlign === 'end' ? q.right - parseFloat(s.paddingRight) - w : q.left + parseFloat(s.paddingLeft), y0 = q.top + (q.height - h) / 2;
+          if (w > 0) add({ left: x0, top: y0, right: x0 + w, bottom: y0 + h, width: w, height: h }, c, Math.sqrt(w * h * 0.6) * c.a * (val ? 1.4 : .4));
+        }
+      }
+    }
+    if (glow) {   // Flamme: Leuchtkern unten in der Mitte des Bildes
+      const q = el.getBoundingClientRect(), c = parse(el.getAttribute('data-glow').replace(/^#(..)(..)(..)$/, (m, a, b, d) => `rgb(${parseInt(a, 16)},${parseInt(b, 16)},${parseInt(d, 16)})`));
+      if (c && q.width > 2) { const w = q.width * .5, h = q.height * .4, x0 = q.left + (q.width - w) / 2, y0 = q.top + q.height * .5; add({ left: x0, top: y0, right: x0 + w, bottom: y0 + h, width: w, height: h }, c, Math.sqrt(w * h) * .55); }
+    }
+    RAW.set(el, v); return v;
+  };
+  const chainOf = el => {
+    if (CHAIN.has(el)) return CHAIN.get(el);
+    let v = null;
+    if (!el.checkVisibility || el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) {
+      v = [];
+      for (let x = el; x && x.nodeType === 1; x = x.parentElement) { const c = cs(x), op = +c.opacity, clip = x !== el && c.overflow !== 'visible'; if (op < 1 || clip) v.push({ x, op, rc: clip ? x.getBoundingClientRect() : null }); }
+    }
+    CHAIN.set(el, v); return v;
+  };
   const conic = box => {
     const R = box.getBoundingClientRect();
     const em = [];
-    const vis = (el, q) => {
-      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) return null;
-      let x = el, op = 1, l = q.left, t = q.top, r = q.right, b = q.bottom;
-      while (x && x !== box.parentElement) { const c = cs(x); op *= +c.opacity; if (x !== el && c.overflow !== 'visible') { const z = x.getBoundingClientRect(); l = Math.max(l, z.left); t = Math.max(t, z.top); r = Math.min(r, z.right); b = Math.min(b, z.bottom); } x = x.parentElement; }
-      if (op < .05 || r - l < 1 || b - t < 1) return null; return { x0: l, y0: t, x1: r, y1: b, op };
-    };
-    const push = (el, q, c, w) => {
-      if (!el.hasAttribute('data-glow') && el.closest('.av,img,.cm,.noglow')) return; if (!isCI(c)) return;
-      const sat = (Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b)) / 255, lum = lumOf(c);
-      w *= 0.3 + 1.3 * lum + 2 * sat; if (sat < .08 && lum < .8) w *= .35;
-      const v = vis(el, q); if (v) em.push({ x0: v.x0, y0: v.y0, x1: v.x1, y1: v.y1, c, w: w * v.op * Math.sqrt(((v.x1 - v.x0) * (v.y1 - v.y0)) / (q.width * q.height)) });
-    };
-    const tw = document.createTreeWalker(box, NodeFilter.SHOW_TEXT); let tn; const rg = document.createRange();
-    while ((tn = tw.nextNode())) {
-      if (!tn.textContent.trim()) continue; const pe = tn.parentElement; const c = parse(cs(pe).color); if (!c) continue;
-      rg.selectNodeContents(tn); for (const q of rg.getClientRects()) if (q.width > 1) push(pe, q, c, Math.sqrt(q.width * q.height * 0.6) * c.a);
+    for (const el of [box, ...box.querySelectorAll('*')]) {
+      const raw = rawOf(el); if (!raw.length) continue;
+      const ch = chainOf(el); if (!ch) continue;
+      let op = 1, l = -1e9, t = -1e9, r = 1e9, b = 1e9;
+      for (const z of ch) { if (z.x !== box && !box.contains(z.x)) continue; op *= z.op; if (z.rc) { l = Math.max(l, z.rc.left); t = Math.max(t, z.rc.top); r = Math.min(r, z.rc.right); b = Math.min(b, z.rc.bottom); } }
+      if (op < .05) continue;
+      for (const e of raw) {
+        if (e.bg && e.area >= R.width * R.height * .6) continue;
+        const x0 = Math.max(l, e.q.left), y0 = Math.max(t, e.q.top), x1 = Math.min(r, e.q.right), y1 = Math.min(b, e.q.bottom);
+        if (x1 - x0 < 1 || y1 - y0 < 1) continue;
+        em.push({ x0, y0, x1, y1, c: e.c, w: e.w * op * Math.sqrt(((x1 - x0) * (y1 - y0)) / (e.q.width * e.q.height)) });
+      }
     }
-    // Eingabefelder: Wert (oder Platzhalter) strahlt wie Text
-    for (const el of [box, ...box.querySelectorAll('input,textarea')]) {
-      if (!/^(INPUT|TEXTAREA)$/.test(el.tagName) || /^(checkbox|radio|hidden|range|file)$/.test(el.type)) continue;
-      const v = el.value || el.getAttribute('value') || '', ph = el.getAttribute('placeholder') || '', txt = v || ph; if (!txt.trim()) continue;
-      const s = cs(el), q = el.getBoundingClientRect(); let c = parse(s.color); if (!c) continue;
-      if (!v) c = { r: 255, g: 255, b: 255, a: .6 };   // Platzhalter strahlt gedämpft weiß
-      const fs = parseFloat(s.fontSize) || 16, h = Math.min(q.height, fs * 1.1);
-      MC.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`; const w = Math.min(q.width - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight), MC.measureText(txt).width);
-      const x0 = s.textAlign === 'right' || s.textAlign === 'end' ? q.right - parseFloat(s.paddingRight) - w : q.left + parseFloat(s.paddingLeft), y0 = q.top + (q.height - h) / 2;
-      push(el, { left: x0, top: y0, right: x0 + w, bottom: y0 + h, width: w, height: h }, c, Math.sqrt(w * h * 0.6) * c.a * (v ? 1.4 : .4));
-    }
-    // Bilder mit Tagesfarbe (z. B. Flammen) strahlen in dieser Farbe
-    for (const el of box.querySelectorAll('[data-glow]')) { const q = el.getBoundingClientRect(), c = parse(el.getAttribute('data-glow').replace(/^#(..)(..)(..)$/, (m, a, b, d) => `rgb(${parseInt(a, 16)},${parseInt(b, 16)},${parseInt(d, 16)})`)); if (c && q.width > 2) { const w = q.width * .5, h = q.height * .4, x0 = q.left + (q.width - w) / 2, y0 = q.top + q.height * .5; push(el, { left: x0, top: y0, right: x0 + w, bottom: y0 + h, width: w, height: h }, c, Math.sqrt(w * h) * .55 * (+cs(el).opacity || 1)); } }   // Flamme: Leuchtkern unten in der Mitte des Bildes
-    for (const el of box.querySelectorAll('*')) {
-      const q = el.getBoundingClientRect(); if (q.width < 2 || q.height < 2) continue;
-      const s = cs(el), bg = parse(s.backgroundColor);
-      if (bg && bg.a > .5 && s.backgroundImage === 'none' && q.width * q.height < R.width * R.height * .6) push(el, q, bg, Math.sqrt(q.width * q.height) * bg.a);
-      if (el.tagName === 'svg') { const c = parse(s.color); if (c) push(el, q, c, Math.sqrt(q.width * q.height) * .45 * c.a); }
-    }
+    const rad0 = Math.min(parseFloat(cs(box).borderTopLeftRadius) || 0, R.width / 2, R.height / 2);
+    const key = Math.round(R.width) + 'x' + Math.round(R.height) + 'r' + Math.round(rad0) + '|' + FLOOR + '|' + em.map(e => [Math.round(e.x0 - R.left), Math.round(e.y0 - R.top), Math.round(e.x1 - R.left), Math.round(e.y1 - R.top), e.c.r, e.c.g, e.c.b, Math.round(e.w * 10)].join(',')).join(';');
+    const hit = CACHE.get(key); if (hit) { CACHE.delete(key); CACHE.set(key, hit); return hit; }
     const cx = R.left + R.width / 2, cy = R.top + R.height / 2;
     const rad = Math.min(parseFloat(cs(box).borderTopLeftRadius) || 0, R.width / 2, R.height / 2);
     const N = Math.max(48, Math.min(180, Math.round((R.width + R.height) / 2 / 2) * 2)), pts = [];
@@ -6320,30 +6346,77 @@ const RIM = (() => {
       pts.push(`rgba(${Math.round(Math.min(255, r * k2))},${Math.round(Math.min(255, g * k2))},${Math.round(Math.min(255, bl * k2))},${a.toFixed(2)}) ${(i / N * 360).toFixed(1)}deg`);
     }
     pts.push(pts[0].replace(/ [\d.]+deg$/, ' 360deg'));
-    return `conic-gradient(${pts.join(',')})`;
+    const res = `conic-gradient(${pts.join(',')})`;
+    CACHE.set(key, res); if (CACHE.size > 1500) CACHE.delete(CACHE.keys().next().value); DIRTYC = true;
+    return res;
   };
-  const run = (root = document.body) => {
-    CS = new Map();
-    for (const el of root.querySelectorAll('[data-rim],[data-tint]')) for (const k of ['data-rim', 'data-tint', 'data-rim-g', 'data-rim-rel', 'data-rim-in']) el.removeAttribute(k);
-    const all = [...root.querySelectorAll('*')];
-    TINT = new Set(all.filter(isTint));
-    const boxes = all.filter(isBox);
-    const bset = new Set(boxes);
-    const out = boxes.map(b => { const s = cs(b); const bd = ['Top', 'Right', 'Bottom', 'Left'].every(sd => parseFloat(s['border' + sd + 'Width']) >= 1 && s['border' + sd + 'Style'] === 'solid'); return [b, surfOf(b), conic(b), bd]; });
-    const pos = out.map(([b]) => cs(b).position === 'static'), gl = out.map(([b]) => b.matches(GLASS));
-    out.forEach(([b, s, g, bd], i) => { b.style.setProperty('--rg', g); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b'); if (/^(INPUT|TEXTAREA|SELECT|IMG)$/.test(b.tagName)) { b.setAttribute('data-rim-in', ''); return; } if (gl[i]) b.setAttribute('data-rim-g', ''); if (pos[i]) b.setAttribute('data-rim-rel', ''); });   // Eingabefelder können keinen Ring als Pseudo-Element tragen
+  const ATTRS = ['data-rim', 'data-tint', 'data-rim-g', 'data-rim-rel', 'data-rim-in'];
+  // Aktualisiert nur die Boxen, die von einer Änderung betroffen sind; geänderte Ränder blenden weich über
+  const update = (roots, anim = true) => {
+    CS = new Map(); REG = new Set(); RAW = new Map(); CHAIN = new Map();
+    for (const r of roots) { if (!r || r.nodeType !== 1 || !r.isConnected || (PRE && PRE.contains(r) && !PREWARM)) continue; REG.add(r); for (const el of r.querySelectorAll('*')) REG.add(el); }
+    if (!REG.size) return 0;
+    const old = new Map();
+    for (const el of REG) { if (el.hasAttribute('data-rim')) old.set(el, el.style.getPropertyValue('--rg')); for (const k of ATTRS) el.removeAttribute(k); }
+    TINT = new Set([...REG].filter(isTint));
+    const boxes = [...REG].filter(isBox);
+    // Boxen außerhalb, die eine geänderte Stelle enthalten: Licht dringt nach außen
+    const outer = new Set();
+    for (const r of roots) { let x = r && r.parentElement; while (x && x !== document.body) { if (!REG.has(x) && x.hasAttribute('data-rim')) outer.add(x); x = x.parentElement; } }
+    const out = boxes.map(b => { const s = cs(b); const bd = ['Top', 'Right', 'Bottom', 'Left'].every(sd => parseFloat(s['border' + sd + 'Width']) >= 1 && s['border' + sd + 'Style'] === 'solid'); return [b, surfOf(b), conic(b), bd, cs(b).position === 'static', b.matches(GLASS)]; });
+    const outO = [...outer].map(b => [b, conic(b)]);
+    const set = (b, g, prev) => {
+      if (anim && prev && prev !== g) { b.style.setProperty('--rg0', prev); b.setAttribute('data-rimx', b.getAttribute('data-rimx') === 'a' ? 'b' : 'a'); clearTimeout(b._rimT); b._rimT = setTimeout(() => b.removeAttribute('data-rimx'), 320); }
+      b.style.setProperty('--rg', g);
+    };
+    for (const [b, s, g, bd, st, gl] of out) {
+      set(b, g, old.has(b) ? old.get(b) : OLDK.get(NEWK.get(b))); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b');
+      if (/^(INPUT|TEXTAREA|SELECT|IMG)$/.test(b.tagName)) { b.setAttribute('data-rim-in', ''); continue; }   // Eingabefelder können keinen Ring als Pseudo-Element tragen
+      if (gl) b.setAttribute('data-rim-g', ''); if (st) b.setAttribute('data-rim-rel', '');
+    }
+    for (const [b, g] of outO) set(b, g, b.style.getPropertyValue('--rg'));
     for (const el of TINT) el.setAttribute('data-tint', '');
-    CS = new Map(); TINT = new Set(); return out.length;
+    CS = new Map(); TINT = new Set(); REG = new Set(); RAW = new Map(); CHAIN = new Map();
+    clearTimeout(SAVE); SAVE = setTimeout(saveCache, 1500);
+    return out.length + outO.length;
   };
-  let tm = 0, last = 0;
-  const soon = () => { if (tm) return; tm = setTimeout(() => { tm = 0; const wait = 600 - (Date.now() - last); if (wait > 0) { tm = setTimeout(() => { tm = 0; soon(); }, wait); return; } last = Date.now(); requestAnimationFrame(() => run()); }, 120); };
+  let SAVE = 0, PRE = null, PREWARM = false;
+  const run = (root = document.body) => update([root], false);
+  // Unsichtbar vorberechnen: Seiten werden außerhalb des Bildschirms aufgebaut, die Ränder landen im Speicher
+  const prewarm = (pages, width) => {
+    if (!pages.length) return;
+    if (!PRE) { PRE = document.createElement('div'); PRE.setAttribute('aria-hidden', 'true'); PRE.style.cssText = `position:fixed;left:0;top:0;width:${width}px;transform:translateX(-300vw);pointer-events:none;contain:layout paint`; document.body.appendChild(PRE); }
+    const [html, ...rest] = pages;
+    try { PREWARM = true; PRE.innerHTML = `<div class="page">${html}</div>`; update([PRE], false); } catch (e) {} finally { PREWARM = false; PRE.innerHTML = ''; }
+    (window.requestIdleCallback || (f => setTimeout(f, 60)))(() => prewarm(rest, width));
+  };
+  // Beim Neuaufbau einer Seite: alte Ränder über die Position im Baum den neuen Elementen zuordnen
+  const pathOf = (el, top) => { let p = ''; for (let x = el; x && x !== top.parentNode; x = x.parentElement) { let i = 0, y = x; while ((y = y.previousElementSibling)) i++; p = x.tagName + '.' + (x.getAttribute('class') || '') + ':' + i + '/' + p; } return p; };
+  let OLDK = new Map(), NEWK = new Map();
+  const onMut = recs => {
+    const roots = new Set(); OLDK = new Map(); NEWK = new Map();
+    recs.forEach((r, ri) => {
+      const t = r.target.nodeType === 1 ? r.target : r.target.parentElement;
+      if (!t || (PRE && PRE.contains(t))) return;
+      roots.add(t);
+      if (r.type !== 'childList') return;
+      [...r.removedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('[data-rim]')]) if (el.hasAttribute('data-rim')) OLDK.set(ri + '#' + i + '#' + pathOf(el, n), el.style.getPropertyValue('--rg')); });
+      [...r.addedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('*')]) NEWK.set(el, ri + '#' + i + '#' + pathOf(el, n)); });
+    });
+    // nur die äußersten geänderten Stellen
+    const list = [...roots].filter(x => ![...roots].some(y => y !== x && y.contains(x)));
+    if (list.length) update(list);
+    OLDK = new Map(); NEWK = new Map();
+  };
+  const soon = e => { const t = e && e.target && e.target.nodeType === 1 ? e.target : null; if (e && e.animationName && /^rim/.test(e.animationName)) return; update([t && t !== window && t.closest ? (t.closest('[data-rim]') || t) : document.body]); };
   const start = () => {
-    new MutationObserver(soon).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded', 'hidden', 'open', 'disabled', 'src'] });
-    addEventListener('resize', soon); addEventListener('focusin', soon); addEventListener('focusout', soon); addEventListener('change', soon); addEventListener('transitionend', soon); addEventListener('animationend', soon);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(soon);
-    soon();
+    new MutationObserver(onMut).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded', 'hidden', 'open', 'disabled', 'src'] });
+    let rz = 0; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => run(), 150); });
+    for (const ev of ['focusin', 'focusout', 'change', 'transitionend', 'animationend']) addEventListener(ev, soon);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => run());
+    run();
   };
-  return { run, soon, start, set floor(v) { FLOOR = v; } };
+  return { run, update, soon, start, prewarm, set floor(v) { FLOOR = v; } };
 })();
 /* RIMLIGHT-END */
 
@@ -6352,5 +6425,14 @@ if (location.hash === '#spot' || location.hash === '#spots') location.hash = '#s
 if (cfg.me) loadChat();
 render();
 RIM.start();
+// Ränder der Hauptseiten beim Start im Hintergrund vorberechnen
+const rimPages = () => [
+  `<header class="head"><div class="brand built">BUILT</div>${spotRing() || flameCap()}${chatBtn()}${bellBtn()}${gearBtn()}</header><main class="view">${viewStart()}</main>` + tabbar('start'),
+  head('Verlauf') + `<main class="view">${viewVerlauf()}</main>` + tabbar('verlauf'),
+  head('Buddies') + `<main class="view">${viewBuddies()}</main>` + tabbar('buddies'),
+  `<header class="head"><div class="brand"></div>${gearBtn()}</header><main class="view">${viewProfile(cfg.me)}</main>` + tabbar('profil'),
+  subhead('start') + `<main class="view nobar">${viewSettings()}</main>`,
+];
+setTimeout(() => { try { if (cfg.me && $('#page')) RIM.prewarm(rimPages(), $('#page').clientWidth); } catch (e) {} }, 900);
 loadSpots().then(() => { if (cfg.me && ['start', 'kamera', 'profil', 'spot-bild'].includes(view)) render(); if (cfg.me && cfg.url && !syncing) spotSync(); });
 if (cfg.me && cfg.url) sync({ overlay: true });
