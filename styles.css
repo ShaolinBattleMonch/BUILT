@@ -49,8 +49,10 @@ img { max-width: 100%; }
 [data-rim] { border-color: transparent !important; background-clip: padding-box !important; box-shadow: none !important; }
 [data-rim]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--rg); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; }
 [data-rim]::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--rg0, none); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; opacity: 0; }
-[data-rimx="a"]::before { animation: rimOutA var(--rimd, .28s) ease var(--rimdl, 0s) forwards; } [data-rimx="b"]::before { animation: rimOutB var(--rimd, .28s) ease var(--rimdl, 0s) forwards; }
-[data-rimx="a"]::after { animation: rimInA var(--rimd, .28s) ease var(--rimdl, 0s); } [data-rimx="b"]::after { animation: rimInB var(--rimd, .28s) ease var(--rimdl, 0s); }
+[data-rimx="a"]::before { animation: rimOutA var(--rimd, .18s) ease var(--rimdl, 0s) forwards; } [data-rimx="b"]::before { animation: rimOutB var(--rimd, .18s) ease var(--rimdl, 0s) forwards; }
+[data-rimx="a"]::after { animation: rimInA var(--rimd, .18s) ease var(--rimdl, 0s); } [data-rimx="b"]::after { animation: rimInB var(--rimd, .18s) ease var(--rimdl, 0s); }
+/* Überblendung ohne Abdunkeln: alter und neuer Rand addieren sich (alt·(1−p) + neu·p) */
+[data-rimx] { isolation: isolate; } [data-rimx]::before, [data-rimx]::after { mix-blend-mode: plus-lighter; }
 @keyframes rimOutA { from { opacity: 1; } to { opacity: 0; } } @keyframes rimOutB { from { opacity: 1; } to { opacity: 0; } }
 @keyframes rimInA { from { opacity: 0; } to { opacity: 1; } } @keyframes rimInB { from { opacity: 0; } to { opacity: 1; } }
 [data-rim-rel] { position: relative; }
@@ -293,7 +295,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 
 /* Modal */
 .backdrop { position: fixed; left: 0; right: 0; top: 0; height: var(--H, 100vh); background: rgba(0,0,0,.6); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
-.sheet { width: 100%; max-width: 600px; max-height: calc(var(--H, 100vh) - var(--sat) - 12px); overscroll-behavior: contain; overflow-y: auto; border-radius: 28px 28px 0 0; padding: 18px max(16px, var(--sar)) calc(22px + var(--sab)) max(16px, var(--sal)); display: flex; flex-direction: column; gap: 14px; background: linear-gradient(180deg, rgba(38,38,38,.94), rgba(10,10,10,.97)); border-bottom: 0; }
+.sheet { width: 100%; max-width: 600px; max-height: calc(var(--H, 100vh) - var(--sat) - 12px); overscroll-behavior: none; overflow-y: auto; border-radius: 28px 28px 0 0; padding: 18px max(16px, var(--sar)) calc(22px + var(--sab)) max(16px, var(--sal)); display: flex; flex-direction: column; gap: 14px; background: rgba(0,0,0,.5); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); border-bottom: 0; }
 .sheet h2 { font-family: var(--display); font-weight: 800; font-size: 26px; letter-spacing: -.02em; margin: 0; }
 /* Vollbild-Popup: reicht bis knapp unter die Statusleiste, Pfeil oben links, feste Leiste unten */
 .sheet.full { height: calc(var(--H, 100vh) - var(--sat) - 10px); max-height: none; padding-top: 0; padding-bottom: 0; gap: 14px; border: 1px solid rgba(255,255,255,.16); border-bottom: 0; }
@@ -1111,7 +1113,7 @@ body:has(#chat-reply) .view.chat-view { padding-bottom: calc(var(--sab) + var(--
 .cmsg.has-av { flex-direction: row; align-items: flex-end; gap: 8px; max-width: 90%; }
 .cmsg.has-av .cav { flex: none; padding-bottom: 20px; }
 .cmcol { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; min-width: 0; }
-.scan { position: fixed; inset: 0; background: #1c1c1e; display: flex; flex-direction: column; padding-top: calc(var(--sat, 0px) + 8px); z-index: 30; }
+.scan { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; padding-top: calc(var(--sat, 0px) + 8px); z-index: 30; }
 .scan .head { display: flex; align-items: center; gap: 8px; padding: 0 16px; }
 .scan-c { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; }
 .scan-f { width: 250px; height: 250px; position: relative; border-radius: 22px; overflow: hidden; }
@@ -1213,3 +1215,14 @@ button.vaultcard { width: 100%; font: inherit; cursor: pointer; }
 .vaultcard.locked .ic .slash { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
 
 .sheet { border-color: transparent; }
+
+/* 3.8: Glas-Overlay über der Seite (Bibliothek, Notizen über dem Plan) */
+.ovl { position: fixed; left: 0; right: 0; top: 0; height: var(--H, 100vh); z-index: 25; overflow-x: hidden; overflow-y: auto; overscroll-behavior: none; -webkit-overflow-scrolling: touch; background: rgba(0,0,0,.5); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4); }
+.ovl.in { animation: ovlIn .26s ease-out; }
+.ovl.out { animation: ovlOut .22s ease-in forwards; pointer-events: none; }
+@keyframes ovlIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ovlOut { from { opacity: 1; } to { opacity: 0; } }
+.ovl.in > main.view { animation: ovlUp .26s cubic-bezier(.2,.8,.2,1); }
+@keyframes ovlUp { from { transform: translateY(18px); } to { transform: none; } }
+/* Schalter-Zeilen mit mehr Luft */
+.rows .row.tgl { padding-top: 14px; padding-bottom: 14px; min-height: 60px; }

@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.7.6';
+const APP_VERSION = '3.8.0';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -3022,6 +3022,12 @@ function setPage(html, tone) {
   page.innerHTML = html;
   BG.update(tone, page.offsetHeight);
 }
+/* Glas-Overlays: Bibliothek und Notizen laufen über dem Plan (bzw. Notizen aus dem Training über dem Training) */
+const OVL_VIEWS = ['bibliothek', 'notizen'];
+function ovlBase(v) { return v === 'bibliothek' ? 'plan' : v === 'notizen' ? (NOTE_FOCUS && NOTE_FOCUS.from === 'training' && draft ? 'training' : 'plan') : v; }
+function planPage() { return head('Plan') + `<main class="view">${viewPlan()}</main>` + tabbar('plan'); }
+function planTone() { return pkind() === 'crew' && !hasCrew() ? '' : DAY_TONE[builder.day] || ''; }
+function ovlWrap(inner, name) { const opening = name !== view && !OVL_VIEWS.includes(view); return `<div class="ovl${opening ? ' in' : ''}" data-noswipe>${inner.replace(' id="head"', '')}</div>`; }
 function render() {
   const app = $('#app');
   if (!cfg.me) { document.body.dataset.tone = ''; setPage(viewSetup(), ''); return; }
@@ -3046,7 +3052,7 @@ function render() {
     case 'training': if (!draft) { location.hash = '#start'; return; } html = viewTraining(); tone = DAY_TONE[draft.day]; break;
     case 'bearbeiten': if (!edraft) { location.hash = '#verlauf'; return; } html = withEd(viewEdit); tone = DAY_TONE[edraft.day]; break;
     case 'verlauf': html = head('Verlauf') + `<main class="view">${viewVerlauf()}</main>` + tabbar('verlauf'); break;
-    case 'plan': html = head('Plan') + `<main class="view">${viewPlan()}</main>` + tabbar('plan'); tone = pkind() === 'crew' && !hasCrew() ? '' : DAY_TONE[builder.day] || ''; break;
+    case 'plan': html = planPage(); tone = planTone(); break;
     case 'einladungen': html = subhead('einstellungen') + `<main class="view nobar">${ACCESS && ACCESS.admin ? viewInvites() : '<div class="empty">Nur für Admins.</div>'}</main>`; if (name !== view && ACCESS && ACCESS.admin) invLoad(); break;
     case 'privatsphaere': html = subhead(PZS && PZS.reopen ? 'start' : 'einstellungen') + `<main class="view nobar">${viewPrivacy()}</main>`; break;
     case 'daten': html = subhead('einstellungen') + `<main class="view nobar">${viewData()}</main>`; break;
@@ -3054,10 +3060,12 @@ function render() {
     case 'buddies': html = head('Buddies') + `<main class="view">${viewBuddies()}</main>` + tabbar('buddies'); break;
     case 'crew': html = subhead('buddies') + `<main class="view">${viewCrew()}</main>` + tabbar('buddies'); break;
     case 'scanner': html = viewScanner(); break;
-    case 'bibliothek': html = subhead('plan') + `<main class="view">${viewLibrary()}</main>` + tabbar('plan'); break;
+    case 'bibliothek': html = planPage() + ovlWrap(subhead('plan') + `<main class="view">${viewLibrary()}</main>`, name); tone = planTone(); break;
     case 'notizen': {
       const fromTr = NOTE_FOCUS && NOTE_FOCUS.from === 'training' && draft;
-      html = `<header class="head" id="head">${fromTr ? backBtn('training', 'Zurück zum Training') : backBtn('plan')}<div class="brand"></div></header><main class="view">${viewNotes3(arg)}</main>` + (fromTr ? '' : tabbar('plan')); tone = 'y'; break;
+      const inner = `<header class="head">${fromTr ? backBtn('training', 'Zurück zum Training') : backBtn('plan')}<div class="brand"></div></header><main class="view">${viewNotes3(arg)}</main>`;
+      if (fromTr) { html = viewTraining() + ovlWrap(inner, name); tone = DAY_TONE[draft.day]; } else { html = planPage() + ovlWrap(inner, name); tone = planTone(); }
+      break;
     }
     case 'glocke': html = subhead(draft ? 'training' : 'start') + `<main class="view">${viewBell()}</main>` + (draft ? '' : tabbar('')); break;
     case 'einstellungen': html = subhead(draft ? 'training' : 'start') + `<main class="view nobar">${viewSettings()}</main>`; break;
@@ -3080,9 +3088,16 @@ function render() {
     default: html = `<header class="head" id="head"><div class="brand built">BUILT</div>${spotRing() || flameCap()}${chatBtn()}${bellBtn()}${gearBtn()}</header><main class="view">${viewStart()}</main>` + tabbar('start');
   }
   document.body.dataset.tone = tone;
+  const sameBase = ovlBase(name) === ovlBase(view);
+  try { RIM.nav = !sameBase; } catch (e) {}   // Randlicht: echter Seitenwechsel → langsame Überblendung (Overlay öffnen/schließen zählt nicht)
+  const oldOvl = name !== view && OVL_VIEWS.includes(view) && !OVL_VIEWS.includes(name) ? $('#page .ovl') : null;
+  const keepTop = app.scrollTop, ovPrev = name === view ? $('#page .ovl') : null, ovTop = ovPrev ? ovPrev.scrollTop : 0;
   setPage(html, tone);
+  if (ovPrev) { const o = $('#page .ovl'); if (o) o.scrollTop = ovTop; }   // Overlay behält beim Neuaufbau seine Scroll-Position
+  if (oldOvl && sameBase) { oldOvl.classList.remove('in'); oldOvl.classList.add('out'); oldOvl.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); app.appendChild(oldOvl); setTimeout(() => oldOvl.remove(), 240); }
   if (name !== view) {
-    app.scrollTop = 0; view = name;
+    if (sameBase) app.scrollTop = keepTop; else app.scrollTop = 0;
+    view = name;
     if (name === 'notizen' && NOTE_FOCUS) { const c = document.getElementById('nc-' + NOTE_FOCUS.ex); if (c) { c.scrollIntoView({ block: 'center' }); NOTE_FOCUS.t = Date.now(); } }
     if (name === 'scanner') startScan();
     trackView(name || 'start');
@@ -3113,7 +3128,7 @@ function flameCap() {
   const n = flameStats(cfg.me).streak;
   return `<button class="fcap glass" data-act="to-flames" aria-label="Dein Wochenstreak: ${n} ${n === 1 ? 'Woche' : 'Wochen'}. Zu den Flammen">${flameImg(cfg.me)}<b>${n}</b></button>`;
 }
-function onScroll() { const h = $('#head'); if (h) h.classList.toggle('scrolled', $('#app').scrollTop > 4); const sh = $('.sheet.full'); if (sh) sh.classList.toggle('scrolled', sh.scrollTop > 40); }
+function onScroll() { const h = $('#head'); if (h) h.classList.toggle('scrolled', $('#app').scrollTop > 4); const ov = $('#page .ovl'); if (ov) { const oh = ov.querySelector('.head'); if (oh) oh.classList.toggle('scrolled', ov.scrollTop > 4); } const sh = $('.sheet.full'); if (sh) sh.classList.toggle('scrolled', sh.scrollTop > 40); }
 document.addEventListener('scroll', onScroll, { passive: true, capture: true });
 /* Echte Bildschirmhöhe: Als App vom Home-Bildschirm meldet iOS teils eine zu kleine Höhe, dann entstünde unten ein Balken. */
 function setHeight() {
@@ -6366,7 +6381,8 @@ const RIM = (() => {
     for (const r of roots) { let x = r && r.parentElement; while (x && x !== document.body) { if (!REG.has(x) && x.hasAttribute('data-rim')) outer.add(x); x = x.parentElement; } }
     const out = boxes.map(b => { const s = cs(b); const bd = ['Top', 'Right', 'Bottom', 'Left'].every(sd => parseFloat(s['border' + sd + 'Width']) >= 1 && s['border' + sd + 'Style'] === 'solid'); return [b, surfOf(b), conic(b), bd, cs(b).position === 'static', b.matches(GLASS)]; });
     const outO = [...outer].map(b => [b, conic(b)]); const cntN = {};
-    const swap = roots.some(r => r && r.id === 'page');   // Seitenwechsel: langsame Überblendung
+    const swap = NAV && roots.some(r => r && r.id === 'page');   // Seitenwechsel (nicht: Neuaufbau derselben Seite, z. B. Neuigkeit ausklappen): langsame Überblendung
+    if (roots.some(r => r && (r.id === 'page' || r.contains && r.contains(document.getElementById('page'))))) NAV = false;
     if (swap) SWAPT = performance.now();
     const slow = swap || (anim && performance.now() - SWAPT < 1200);   // Nachladen direkt nach dem Wechsel (z. B. Feed) bleibt langsam
     const now = performance.now();
@@ -6375,7 +6391,7 @@ const RIM = (() => {
       const run = b._rimF && b._rimF.t + b._rimF.d > now ? b._rimF : (prev && typeof prev === 'object' && prev.f && prev.f.t + prev.f.d > now ? prev.f : null);
       const pg = prev && typeof prev === 'object' ? prev.g : prev;
       if (run) start(b, run.g0, run.t, run.d);   // auch bei laufender Überblendung neu ansetzen (das Messen baut das Pseudo-Element neu auf) – mit negativer Verzögerung an der gleichen Stelle weiter
-      else if (anim && pg && pg !== g) start(b, pg, now, slow ? 1000 : 280);
+      else if (anim && pg && pg !== g) start(b, pg, now, slow ? 1000 : 180);
       b.style.setProperty('--rg', g);
     };
     const start = (b, g0, t, d) => {
@@ -6396,7 +6412,7 @@ const RIM = (() => {
     clearTimeout(SAVE); SAVE = setTimeout(saveCache, 1500);
     return out.length + outO.length;
   };
-  let SAVE = 0, PRE = null, PREWARM = false, SWAPT = -1e9;
+  let SAVE = 0, PRE = null, PREWARM = false, SWAPT = -1e9, NAV = false;
   const run = (root = document.body) => update([root], false);
   // Unsichtbar vorberechnen: Seiten werden außerhalb des Bildschirms aufgebaut, die Ränder landen im Speicher
   const prewarm = (pages, width) => {
@@ -6438,7 +6454,7 @@ const RIM = (() => {
   // Offene Änderungen sofort verarbeiten – z. B. bevor die Seite zum Hereingleiten unsichtbar und verschoben wird, damit das Licht am fertigen Zustand gemessen wird
   let MO = null;
   const flush = () => { if (MO) { const r = MO.takeRecords(); if (r.length) onMut(r); } };
-  return { run, update, soon, start, prewarm, flush, set floor(v) { FLOOR = v; } };
+  return { run, update, soon, start, prewarm, flush, set floor(v) { FLOOR = v; }, set nav(v) { NAV = NAV || v; } };
 })();
 /* RIMLIGHT-END */
 
