@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.7.4';
+const APP_VERSION = '3.7.5';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -6368,14 +6368,23 @@ const RIM = (() => {
     const swap = roots.some(r => r && r.id === 'page');   // Seitenwechsel: langsame Überblendung
     if (swap) SWAPT = performance.now();
     const slow = swap || (anim && performance.now() - SWAPT < 1200);   // Nachladen direkt nach dem Wechsel (z. B. Feed) bleibt langsam
+    const now = performance.now();
+    // Überblendung starten; läuft schon eine (auch auf einem gerade ersetzten Element), wird sie fortgesetzt statt neu gestartet
     const set = (b, g, prev) => {
-      if (anim && prev && prev !== g) { b.style.setProperty('--rg0', prev); if (slow) b.style.setProperty('--rimd', '1s'); else b.style.removeProperty('--rimd'); b.setAttribute('data-rimx', b.getAttribute('data-rimx') === 'a' ? 'b' : 'a'); clearTimeout(b._rimT); b._rimT = setTimeout(() => b.removeAttribute('data-rimx'), slow ? 1050 : 320); }
+      const run = b._rimF && b._rimF.t + b._rimF.d > now ? b._rimF : (prev && typeof prev === 'object' && prev.f && prev.f.t + prev.f.d > now ? prev.f : null);
+      const pg = prev && typeof prev === 'object' ? prev.g : prev;
+      if (run) start(b, run.g0, run.t, run.d);   // auch bei laufender Überblendung neu ansetzen (das Messen baut das Pseudo-Element neu auf) – mit negativer Verzögerung an der gleichen Stelle weiter
+      else if (anim && pg && pg !== g) start(b, pg, now, slow ? 1000 : 280);
       b.style.setProperty('--rg', g);
+    };
+    const start = (b, g0, t, d) => {
+      b._rimF = { g0, t, d }; b.style.setProperty('--rg0', g0); b.style.setProperty('--rimd', d + 'ms'); b.style.setProperty('--rimdl', -(now - t) + 'ms');
+      b.setAttribute('data-rimx', b.getAttribute('data-rimx') === 'a' ? 'b' : 'a'); clearTimeout(b._rimT); b._rimT = setTimeout(() => { b.removeAttribute('data-rimx'); b._rimF = null; }, t + d - now + 40);
     };
     for (const [b, s, g, bd, st, gl] of out) {
       // Seitenwechsel: neue Elemente nur über eindeutige Merkmale (Knopf-Aktion, Link, Bezeichnung) zuordnen, alles andere blendet von der Grundlinie ein
-      let prev = old.has(b) ? old.get(b) : (slow ? null : OLDK.get(NEWK.get(b)));
-      if (prev == null && NEWK.has(b)) { const k = semKey(b); if (!slow || k.split('|').slice(2).some(Boolean)) { cntN[k] = (cntN[k] || 0) + 1; prev = OLDS.get(k + '#' + cntN[k]); } if (prev == null) prev = FADE0; }   // neu: von der feinen Grundlinie einblenden
+      let prev = old.has(b) ? old.get(b) : (swap ? null : OLDK.get(NEWK.get(b)));
+      if (prev == null && NEWK.has(b)) { const k = semKey(b); if (!swap || k.split('|').slice(2).some(Boolean)) { cntN[k] = (cntN[k] || 0) + 1; prev = OLDS.get(k + '#' + cntN[k]); } if (prev == null) prev = FADE0; }   // neu: von der feinen Grundlinie einblenden
       set(b, g, prev); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b');
       if (/^(INPUT|TEXTAREA|SELECT|IMG)$/.test(b.tagName)) { b.setAttribute('data-rim-in', ''); continue; }   // Eingabefelder können keinen Ring als Pseudo-Element tragen
       if (gl) b.setAttribute('data-rim-g', ''); if (st) b.setAttribute('data-rim-rel', '');
@@ -6409,7 +6418,7 @@ const RIM = (() => {
       if (!t || (PRE && PRE.contains(t))) return;
       roots.add(t);
       if (r.type !== 'childList') return;
-      [...r.removedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('[data-rim]')]) if (el.hasAttribute('data-rim')) { const g = el.style.getPropertyValue('--rg'), k = semKey(el); OLDK.set(ri + '#' + i + '#' + pathOf(el, n), g); cntO[k] = (cntO[k] || 0) + 1; OLDS.set(k + '#' + cntO[k], g); } });
+      [...r.removedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('[data-rim]')]) if (el.hasAttribute('data-rim')) { const g = { g: el.style.getPropertyValue('--rg'), f: el._rimF }, k = semKey(el); OLDK.set(ri + '#' + i + '#' + pathOf(el, n), g); cntO[k] = (cntO[k] || 0) + 1; OLDS.set(k + '#' + cntO[k], g); } });
       [...r.addedNodes].filter(n => n.nodeType === 1).forEach((n, i) => { for (const el of [n, ...n.querySelectorAll('*')]) NEWK.set(el, ri + '#' + i + '#' + pathOf(el, n)); });
     });
     // nur die äußersten geänderten Stellen

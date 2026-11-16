@@ -49,8 +49,8 @@ img { max-width: 100%; }
 [data-rim] { border-color: transparent !important; background-clip: padding-box !important; box-shadow: none !important; }
 [data-rim]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--rg); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; }
 [data-rim]::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--rg0, none); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; opacity: 0; }
-[data-rimx="a"]::before { animation: rimOutA var(--rimd, .28s) ease forwards; } [data-rimx="b"]::before { animation: rimOutB var(--rimd, .28s) ease forwards; }
-[data-rimx="a"]::after { animation: rimInA var(--rimd, .28s) ease; } [data-rimx="b"]::after { animation: rimInB var(--rimd, .28s) ease; }
+[data-rimx="a"]::before { animation: rimOutA var(--rimd, .28s) ease var(--rimdl, 0s) forwards; } [data-rimx="b"]::before { animation: rimOutB var(--rimd, .28s) ease var(--rimdl, 0s) forwards; }
+[data-rimx="a"]::after { animation: rimInA var(--rimd, .28s) ease var(--rimdl, 0s); } [data-rimx="b"]::after { animation: rimInB var(--rimd, .28s) ease var(--rimdl, 0s); }
 @keyframes rimOutA { from { opacity: 1; } to { opacity: 0; } } @keyframes rimOutB { from { opacity: 1; } to { opacity: 0; } }
 @keyframes rimInA { from { opacity: 0; } to { opacity: 1; } } @keyframes rimInB { from { opacity: 0; } to { opacity: 1; } }
 [data-rim-rel] { position: relative; }
