@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.7.5';
+const APP_VERSION = '3.7.6';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -6108,6 +6108,7 @@ function hScroll(el) {
 function tabSlideIn() {
   const d = TAB_SLIDE; TAB_SLIDE = 0; if (!d) return;
   const m = $('#page main.view'); if (!m) return;
+  try { RIM.flush(); } catch (e) {}   // Randlicht vor dem Verschieben/Ausblenden messen
   m.style.transition = 'none'; m.style.transform = `translateX(${d * innerWidth * .3}px)`; m.style.opacity = '0';
   m.getBoundingClientRect();
   m.style.transition = 'transform .26s cubic-bezier(.2,.8,.2,1), opacity .2s ease-out'; m.style.transform = ''; m.style.opacity = '';
@@ -6426,15 +6427,18 @@ const RIM = (() => {
     if (list.length) update(list);
     OLDK = new Map(); NEWK = new Map(); OLDS = new Map();
   };
-  const soon = e => { const t = e && e.target && e.target.nodeType === 1 ? e.target : null; if (e && e.animationName && /^rim/.test(e.animationName)) return; update([t && t !== window && t.closest ? (t.closest('[data-rim]') || t) : document.body]); };
+  const soon = e => { const t = e && e.target && e.target.nodeType === 1 ? e.target : null; if (e && e.animationName && /^rim/.test(e.animationName)) return; if (e && e.type === 'transitionend' && t && t.matches && t.matches('main.view')) return; /* Hereingleiten der Seite ändert kein Licht */ update([t && t !== window && t.closest ? (t.closest('[data-rim]') || t) : document.body]); };
   const start = () => {
-    new MutationObserver(onMut).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded', 'hidden', 'open', 'disabled', 'src'] });
+    MO = new MutationObserver(onMut); MO.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded', 'hidden', 'open', 'disabled', 'src'] });
     let rz = 0; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => run(), 150); });
     for (const ev of ['focusin', 'focusout', 'change', 'transitionend', 'animationend']) addEventListener(ev, soon);
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => run());
     run();
   };
-  return { run, update, soon, start, prewarm, set floor(v) { FLOOR = v; } };
+  // Offene Änderungen sofort verarbeiten – z. B. bevor die Seite zum Hereingleiten unsichtbar und verschoben wird, damit das Licht am fertigen Zustand gemessen wird
+  let MO = null;
+  const flush = () => { if (MO) { const r = MO.takeRecords(); if (r.length) onMut(r); } };
+  return { run, update, soon, start, prewarm, flush, set floor(v) { FLOOR = v; } };
 })();
 /* RIMLIGHT-END */
 
