@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.8.0';
+const APP_VERSION = '3.8.1';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -3027,7 +3027,7 @@ const OVL_VIEWS = ['bibliothek', 'notizen'];
 function ovlBase(v) { return v === 'bibliothek' ? 'plan' : v === 'notizen' ? (NOTE_FOCUS && NOTE_FOCUS.from === 'training' && draft ? 'training' : 'plan') : v; }
 function planPage() { return head('Plan') + `<main class="view">${viewPlan()}</main>` + tabbar('plan'); }
 function planTone() { return pkind() === 'crew' && !hasCrew() ? '' : DAY_TONE[builder.day] || ''; }
-function ovlWrap(inner, name) { const opening = name !== view && !OVL_VIEWS.includes(view); return `<div class="ovl${opening ? ' in' : ''}" data-noswipe>${inner.replace(' id="head"', '')}</div>`; }
+function ovlWrap(inner, name) { const opening = name !== view && !OVL_VIEWS.includes(view); return `<div class="ovl${opening ? ' in' : ''}"${opening ? ' data-rim-fx' : ''} data-noswipe>${inner.replace(' id="head"', '')}</div>`; }
 function render() {
   const app = $('#app');
   if (!cfg.me) { document.body.dataset.tone = ''; setPage(viewSetup(), ''); return; }
@@ -3094,7 +3094,7 @@ function render() {
   const keepTop = app.scrollTop, ovPrev = name === view ? $('#page .ovl') : null, ovTop = ovPrev ? ovPrev.scrollTop : 0;
   setPage(html, tone);
   if (ovPrev) { const o = $('#page .ovl'); if (o) o.scrollTop = ovTop; }   // Overlay behält beim Neuaufbau seine Scroll-Position
-  if (oldOvl && sameBase) { oldOvl.classList.remove('in'); oldOvl.classList.add('out'); oldOvl.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); app.appendChild(oldOvl); setTimeout(() => oldOvl.remove(), 240); }
+  if (oldOvl && sameBase) { oldOvl.classList.remove('in'); oldOvl.classList.add('out'); oldOvl.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); oldOvl.setAttribute('data-rim-skip', ''); app.appendChild(oldOvl); setTimeout(() => oldOvl.remove(), 240); }
   if (name !== view) {
     if (sameBase) app.scrollTop = keepTop; else app.scrollTop = 0;
     view = name;
@@ -5193,8 +5193,8 @@ function dayEditSheet(isNew, askDel) {
   const mates = crew && hasCrew() ? (CREW.members || []).filter(p => p !== cfg.me) : [];
   const canDel = PD(b.work).length > 1 && (planOf(cfg.me, b.kind)[d] || isNew);
   $('#modal').innerHTML = `<div class="backdrop" data-act="mclose-bg"><form class="sheet form tone-${DAY_TONE[d]}" id="dayform" role="dialog" aria-modal="true" aria-labelledby="rn-t" novalidate>
-    <span class="eyebrow">${crew ? 'Crew-Plan' : 'Mein Plan'} · ${esc(w.short || DAY_SHORT[d])}</span>
-    <h2 id="rn-t">${isNew ? 'Neuer Trainingstag' : 'Trainingstag umbenennen'}</h2>
+    <div class="rowbetween" style="align-items:center"><span class="eyebrow">${crew ? 'Crew-Plan' : 'Mein Plan'} · ${esc(w.short || DAY_SHORT[d])}</span><button class="iconbtn glass" type="button" data-act="mclose" aria-label="Schließen">${ICON.x}</button></div>
+    <h2 id="rn-t" style="margin-top:-6px">${isNew ? 'Neuer Trainingstag' : 'Trainingstag umbenennen'}</h2>
     <div class="dayinputs"><label>Name<input class="inp" id="dn-title" value="${esc(w.title)}" maxlength="40"></label><label>Kürzel<input class="inp" id="dn-short" value="${esc(w.short || DAY_SHORT[d])}" maxlength="6" autocapitalize="characters"></label></div>
     <span class="help">${crew ? (mates.length ? `Wird mit deiner Crew abgeglichen. ${mates.map(nm).join(', ')} ${mates.length === 1 ? 'bekommt' : 'bekommen'} die Änderung über die Glocke.` : 'Wird mit deiner Crew abgeglichen.') : 'Gilt nur für deinen Plan.'}</span>
     <div class="err" id="dn-err" hidden></div>
@@ -6313,9 +6313,10 @@ const RIM = (() => {
   const chainOf = el => {
     if (CHAIN.has(el)) return CHAIN.get(el);
     let v = null;
-    if (!el.checkVisibility || el.checkVisibility({ opacityProperty: true, visibilityProperty: true, contentVisibilityAuto: true })) {
+    const fx = el.closest('[data-rim-fx]');   // Element blendet gerade als Ganzes ein (Overlay): Licht am fertigen Zustand messen
+    if (!el.checkVisibility || el.checkVisibility({ opacityProperty: !fx, visibilityProperty: true, contentVisibilityAuto: true })) {
       v = [];
-      for (let x = el; x && x.nodeType === 1; x = x.parentElement) { const c = cs(x), op = +c.opacity, clip = x !== el && c.overflow !== 'visible'; if (op < 1 || clip) v.push({ x, op, rc: clip ? x.getBoundingClientRect() : null }); }
+      for (let x = el; x && x.nodeType === 1; x = x.parentElement) { const c = cs(x), op = x.hasAttribute('data-rim-fx') ? 1 : +c.opacity, clip = x !== el && c.overflow !== 'visible'; if (op < 1 || clip) v.push({ x, op, rc: clip ? x.getBoundingClientRect() : null }); }
     }
     CHAIN.set(el, v); return v;
   };
@@ -6402,6 +6403,7 @@ const RIM = (() => {
       // Seitenwechsel: neue Elemente nur über eindeutige Merkmale (Knopf-Aktion, Link, Bezeichnung) zuordnen, alles andere blendet von der Grundlinie ein
       let prev = old.has(b) ? old.get(b) : (swap ? null : OLDK.get(NEWK.get(b)));
       if (prev == null && NEWK.has(b)) { const k = semKey(b); if (!swap || k.split('|').slice(2).some(Boolean)) { cntN[k] = (cntN[k] || 0) + 1; prev = OLDS.get(k + '#' + cntN[k]); } if (prev == null) prev = FADE0; }   // neu: von der feinen Grundlinie einblenden
+      if (b.closest('[data-rim-fx]') && !(b._rimF && b._rimF.t + b._rimF.d > now)) prev = null;   // blendet mit dem Overlay ein
       set(b, g, prev); b.style.setProperty('--rs', s); b.setAttribute('data-rim', bd ? '' : 'b');
       if (/^(INPUT|TEXTAREA|SELECT|IMG)$/.test(b.tagName)) { b.setAttribute('data-rim-in', ''); continue; }   // Eingabefelder können keinen Ring als Pseudo-Element tragen
       if (gl) b.setAttribute('data-rim-g', ''); if (st) b.setAttribute('data-rim-rel', '');
@@ -6431,6 +6433,7 @@ const RIM = (() => {
   const onMut = recs => {
     const roots = new Set(); OLDK = new Map(); NEWK = new Map(); OLDS = new Map(); NEWS = new Map(); const cntO = {}, cntN = {};
     recs.forEach((r, ri) => {
+      if (r.type === 'childList' && [...r.addedNodes, ...r.removedNodes].length && [...r.addedNodes, ...r.removedNodes].every(n => n.nodeType === 1 && n.hasAttribute('data-rim-skip'))) return;
       const t = r.target.nodeType === 1 ? r.target : r.target.parentElement;
       if (!t || (PRE && PRE.contains(t))) return;
       roots.add(t);
@@ -6443,7 +6446,7 @@ const RIM = (() => {
     if (list.length) update(list);
     OLDK = new Map(); NEWK = new Map(); OLDS = new Map();
   };
-  const soon = e => { const t = e && e.target && e.target.nodeType === 1 ? e.target : null; if (e && e.animationName && /^rim/.test(e.animationName)) return; if (e && e.type === 'transitionend' && t && t.matches && t.matches('main.view')) return; /* Hereingleiten der Seite ändert kein Licht */ update([t && t !== window && t.closest ? (t.closest('[data-rim]') || t) : document.body]); };
+  const soon = e => { const t = e && e.target && e.target.nodeType === 1 ? e.target : null; if (e && e.animationName && /^rim/.test(e.animationName)) return; if (e && e.type === 'transitionend' && t && t.matches && t.matches('main.view')) return; if (e && e.animationName && /^ovl/.test(e.animationName)) return; /* Hereingleiten der Seite ändert kein Licht */ update([t && t !== window && t.closest ? (t.closest('[data-rim]') || t) : document.body]); };
   const start = () => {
     MO = new MutationObserver(onMut); MO.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-expanded', 'hidden', 'open', 'disabled', 'src'] });
     let rz = 0; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => run(), 150); });

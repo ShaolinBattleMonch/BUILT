@@ -52,7 +52,7 @@ img { max-width: 100%; }
 [data-rimx="a"]::before { animation: rimOutA var(--rimd, .18s) ease var(--rimdl, 0s) forwards; } [data-rimx="b"]::before { animation: rimOutB var(--rimd, .18s) ease var(--rimdl, 0s) forwards; }
 [data-rimx="a"]::after { animation: rimInA var(--rimd, .18s) ease var(--rimdl, 0s); } [data-rimx="b"]::after { animation: rimInB var(--rimd, .18s) ease var(--rimdl, 0s); }
 /* Überblendung ohne Abdunkeln: alter und neuer Rand addieren sich (alt·(1−p) + neu·p) */
-[data-rimx] { isolation: isolate; } [data-rimx]::before, [data-rimx]::after { mix-blend-mode: plus-lighter; }
+[data-rimx]::before, [data-rimx]::after { mix-blend-mode: plus-lighter; }
 @keyframes rimOutA { from { opacity: 1; } to { opacity: 0; } } @keyframes rimOutB { from { opacity: 1; } to { opacity: 0; } }
 @keyframes rimInA { from { opacity: 0; } to { opacity: 1; } } @keyframes rimInB { from { opacity: 0; } to { opacity: 1; } }
 [data-rim-rel] { position: relative; }
@@ -1225,4 +1225,5 @@ button.vaultcard { width: 100%; font: inherit; cursor: pointer; }
 .ovl.in > main.view { animation: ovlUp .26s cubic-bezier(.2,.8,.2,1); }
 @keyframes ovlUp { from { transform: translateY(18px); } to { transform: none; } }
 /* Schalter-Zeilen mit mehr Luft */
-.rows .row.tgl { padding-top: 14px; padding-bottom: 14px; min-height: 60px; }
+.rows .row { padding-top: 14px; padding-bottom: 14px; }
+.rows .row.tgl { min-height: 60px; }
