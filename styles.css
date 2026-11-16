@@ -49,8 +49,8 @@ img { max-width: 100%; }
 [data-rim] { border-color: transparent !important; background-clip: padding-box !important; box-shadow: none !important; }
 [data-rim]::after { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--rg); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; }
 [data-rim]::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--rg0, none); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); pointer-events: none; opacity: 0; }
-[data-rimx="a"]::before { animation: rimOutA .28s ease forwards; } [data-rimx="b"]::before { animation: rimOutB .28s ease forwards; }
-[data-rimx="a"]::after { animation: rimInA .28s ease; } [data-rimx="b"]::after { animation: rimInB .28s ease; }
+[data-rimx="a"]::before { animation: rimOutA var(--rimd, .28s) ease forwards; } [data-rimx="b"]::before { animation: rimOutB var(--rimd, .28s) ease forwards; }
+[data-rimx="a"]::after { animation: rimInA var(--rimd, .28s) ease; } [data-rimx="b"]::after { animation: rimInB var(--rimd, .28s) ease; }
 @keyframes rimOutA { from { opacity: 1; } to { opacity: 0; } } @keyframes rimOutB { from { opacity: 1; } to { opacity: 0; } }
 @keyframes rimInA { from { opacity: 0; } to { opacity: 1; } } @keyframes rimInB { from { opacity: 0; } to { opacity: 1; } }
 [data-rim-rel] { position: relative; }
@@ -286,7 +286,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 .form label.chk input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: #fff; flex: none; }
 .form label.chk span { display: flex; flex-direction: column; gap: 2px; }
 .form label.chk small { font-size: 13px; color: var(--dim); font-weight: 400; }
-.persbox { display: flex; flex-direction: column; gap: 12px; border: 1px dashed rgba(255,255,255,.3); border-radius: 16px; padding: 12px; }
+.persbox { display: flex; flex-direction: column; gap: 12px; }
 .radios { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .radios legend { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--dim); margin-bottom: 6px; padding: 0; }
 .err { color: var(--danger); font-size: 14px; font-weight: 600; }
@@ -297,7 +297,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 .sheet h2 { font-family: var(--display); font-weight: 800; font-size: 26px; letter-spacing: -.02em; margin: 0; }
 /* Vollbild-Popup: reicht bis knapp unter die Statusleiste, Pfeil oben links, feste Leiste unten */
 .sheet.full { height: calc(var(--H, 100vh) - var(--sat) - 10px); max-height: none; padding-top: 0; padding-bottom: 0; gap: 14px; border: 1px solid rgba(255,255,255,.16); border-bottom: 0; }
-.sheet.full .shead { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; margin: 0 -16px; padding: 10px 16px 8px 8px; background: rgba(30,30,30,.92); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 10px 14px -10px rgba(0,0,0,.6); }
+.sheet.full .shead { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; margin: 0 -16px; padding: 10px 16px 8px 8px; background: #000; box-shadow: none; }
 .sheet.full .shead-t { display: flex; flex-direction: column; min-width: 0; }
 .sheet.full .shead-t .eyebrow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sheet.full .shead-t b { font: 700 16px var(--body); height: 0; opacity: 0; overflow: hidden; transition: opacity .2s, height .2s; }
@@ -1182,7 +1182,7 @@ ul.dots li::before { content: ""; position: absolute; left: 2px; top: .55em; wid
 .form .gearf .gl { font: 500 11px var(--mono); text-transform: uppercase; letter-spacing: .12em; color: var(--dim); }
 .form .gearbar { margin-top: 0; }
 .form .gearbar .pchip { min-height: 38px; font-size: 14px; white-space: nowrap; }
-.persbox .gearbar { margin: 0 -12px; padding: 0 12px 2px; }
+.persbox .gearbar { margin: 0 -16px; padding: 0 16px 2px; }
 
 /* 3.5: Anpassungsvorschlag auf Start und im Training */
 .vor { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
@@ -1211,3 +1211,5 @@ button.vaultcard { width: 100%; font: inherit; cursor: pointer; }
 .vaultcard.locked b { color: #a8a8a8; }
 .vaultcard.locked .ic { position: relative; color: #a8a8a8; border-style: dashed; border-color: #666; }
 .vaultcard.locked .ic .slash { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+
+.sheet { border-color: transparent; }

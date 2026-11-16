@@ -4,7 +4,7 @@
    zuerst auf dem Handy, beim Sync in der Google-Tabelle. Der aktuelle Stand wird immer aus dem Log berechnet.
    Ausnahme: der Vault. Seine Bilder bleiben verschlüsselt nur auf diesem Handy und werden nie synchronisiert. */
 
-const APP_VERSION = '3.7.2';
+const APP_VERSION = '3.7.3';
 const SCRIPT_MIN = 0;            // Google-Skript entfällt ab 3.0
 /* Supabase: Projekt in Frankfurt. Der Publishable Key ist öffentlich, Zugriff regeln die Zeilenrechte in der Datenbank. */
 const SB_URL = (() => { try { return localStorage.getItem('built.sb.url') || 'https://orfbfukamifoqpnpdckb.supabase.co'; } catch (e) { return 'https://orfbfukamifoqpnpdckb.supabase.co'; } })();
@@ -6213,7 +6213,7 @@ const RIM = (() => {
   let CS = new Map(); const MC = document.createElement('canvas').getContext('2d');
   const cs = el => { let v = CS.get(el); if (!v) { v = getComputedStyle(el); CS.set(el, v); } return v; };
   // Graue Tönung: dezente neutrale Flächen (hell oder abdunkelnd) und weiße Glasverläufe ohne Glas-Klasse
-  const NOTINT = '.tgl i,.check,.av,.bar,.daybar,.ld-track,.segs i,.sv-bars i,.photo,.cam-th,.sgrid a,.cs-mini,.cs-spot,.fi-th,.scan,.zstage,.rbub,.pf-ring,.tool,.shutter,.mlab,.dot,.vdot,.badge,.cm,img,svg,video,canvas,select,option,#bg,#bg *,.cm-ov,.cm-ov *,.sv-emo *,.sp-text';
+  const NOTINT = '.shead,.tgl i,.check,.av,.bar,.daybar,.ld-track,.segs i,.sv-bars i,.photo,.cam-th,.sgrid a,.cs-mini,.cs-spot,.fi-th,.scan,.zstage,.rbub,.pf-ring,.tool,.shutter,.mlab,.dot,.vdot,.badge,.cm,img,svg,video,canvas,select,option,#bg,#bg *,.cm-ov,.cm-ov *,.sv-emo *,.sp-text';
   let TINT = new Set();
   const isTint = el => {
     if (el.matches(GLASS) || el.matches(NOTINT) || el.closest('.av,svg,.norim')) return false;
@@ -6243,7 +6243,7 @@ const RIM = (() => {
   const isBox = el => {
     const s0 = cs(el), bg0 = parse(s0.backgroundColor);
     if (bg0 && bg0.a > .5 && lumOf(bg0) > .3) return false;   // helle, gefüllte Knöpfe behalten ihren Look
-    if (el.matches('.cd.sel,.cd.today')) return false;   // Auswahl und heute im Kalender behalten ihren Rahmen
+    if (el.matches('.cd.sel,.cd.today,.sheet')) return false;   // Auswahl/heute im Kalender behalten ihren Rahmen; Sheets ohne äußeren Rand   // Auswahl und heute im Kalender behalten ihren Rahmen
     if (el.matches(GLASS)) return s0.display !== 'none';
     if (TINT.has(el)) {
       const q = el.getBoundingClientRect(), bc0 = parse(s0.borderTopColor), bw0 = parseFloat(s0.borderTopWidth) >= 1 && s0.borderTopStyle !== 'none';
@@ -6365,8 +6365,9 @@ const RIM = (() => {
     for (const r of roots) { let x = r && r.parentElement; while (x && x !== document.body) { if (!REG.has(x) && x.hasAttribute('data-rim')) outer.add(x); x = x.parentElement; } }
     const out = boxes.map(b => { const s = cs(b); const bd = ['Top', 'Right', 'Bottom', 'Left'].every(sd => parseFloat(s['border' + sd + 'Width']) >= 1 && s['border' + sd + 'Style'] === 'solid'); return [b, surfOf(b), conic(b), bd, cs(b).position === 'static', b.matches(GLASS)]; });
     const outO = [...outer].map(b => [b, conic(b)]); const cntN = {};
+    const slow = roots.some(r => r && r.id === 'page');   // Seitenwechsel: langsame Überblendung
     const set = (b, g, prev) => {
-      if (anim && prev && prev !== g) { b.style.setProperty('--rg0', prev); b.setAttribute('data-rimx', b.getAttribute('data-rimx') === 'a' ? 'b' : 'a'); clearTimeout(b._rimT); b._rimT = setTimeout(() => b.removeAttribute('data-rimx'), 320); }
+      if (anim && prev && prev !== g) { b.style.setProperty('--rg0', prev); if (slow) b.style.setProperty('--rimd', '1s'); else b.style.removeProperty('--rimd'); b.setAttribute('data-rimx', b.getAttribute('data-rimx') === 'a' ? 'b' : 'a'); clearTimeout(b._rimT); b._rimT = setTimeout(() => b.removeAttribute('data-rimx'), slow ? 1050 : 320); }
       b.style.setProperty('--rg', g);
     };
     for (const [b, s, g, bd, st, gl] of out) {
